@@ -1,0 +1,4 @@
+-r ../app/requirements.txt
+pytest==7.*
+pytest-cov==4.*    # includes coverage report when testing with pytest
+pytest-xdist==3.*  # allows for running tests on multiple processes for faster testing         

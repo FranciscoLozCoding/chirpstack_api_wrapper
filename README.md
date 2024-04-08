@@ -1,5 +1,5 @@
 # chirpstack-api-wrapper
-An abstraction layer over the chirpstack_api python library. Implements `ChirpstackClient` that simplifies calling the chirpstack grpc api.
+An abstraction layer over the `chirpstack_api` python library. Implements `ChirpstackClient` that simplifies calling the chirpstack grpc api.
 
 ## Using ChirpstackClient
 ```py

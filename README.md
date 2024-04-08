@@ -36,7 +36,7 @@ if __name__ == "__main__":
 ## Using the Lib
 This is not published on pip so use pip together with git.
 ```
-pip install git+https://github.com/waggle-sensor/chirpstack-api-wrapper
+pip install git+https://github.com/waggle-sensor/chirpstack_api_wrapper
 ```
 
 ## Test Suite

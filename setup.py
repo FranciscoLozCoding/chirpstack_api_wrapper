@@ -14,5 +14,5 @@ setup(
     setup_requires=['pytest-runner'],
     tests_require=['pytest==7.*','pytest-cov==4.*','pytest-xdist==3.*'],
     test_suite='test',
-    url='https://github.com/waggle-sensor/chirpstack-api-wrapper',
+    url='https://github.com/waggle-sensor/chirpstack_api_wrapper',
 )

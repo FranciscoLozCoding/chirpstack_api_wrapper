@@ -1,7 +1,7 @@
 import unittest
 from pytest import mark
 from unittest.mock import Mock, patch, MagicMock
-from app.chirpstack_client import ChirpstackClient
+from chirpstack_api_wrapper import ChirpstackClient
 import grpc
 from grpc import _channel as channel
 from chirpstack_api import api
@@ -15,8 +15,8 @@ CHIRPSTACK_ACT_PASSWORD = "test"
 
 class TestLogin(unittest.TestCase):
 
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch('app.chirpstack_client.api.InternalServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.InternalServiceStub')
     def test_login_success(self, mock_internal_service_stub, mock_insecure_channel):
         """
         Test a succesful pass through of login
@@ -41,8 +41,8 @@ class TestLogin(unittest.TestCase):
         # Assert that the auth_token is set correctly
         self.assertEqual(client.auth_token, 'mock_jwt_token')
 
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch('app.chirpstack_client.api.InternalServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.InternalServiceStub')
     def test_login_failure_RpcError_grpcStatusCodeUNAVAILABLE(self, mock_internal_service_stub, mock_insecure_channel):
         """
         Test the login method with a RpcError exception with a grpc.StatusCode.UNAVAILABLE
@@ -70,8 +70,8 @@ class TestLogin(unittest.TestCase):
         # Assert that the system exit code is 1 (indicating failure)
         self.assertEqual(cm.exception.code, 1)
 
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch('app.chirpstack_client.api.InternalServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.InternalServiceStub')
     def test_login_failure_RpcError_grpcStatusCodeOther(self, mock_internal_service_stub, mock_insecure_channel):
         """
         Test the login method with a RpcError exception with a grpc.StatusCode.UNAUTHENTICATED
@@ -99,8 +99,8 @@ class TestLogin(unittest.TestCase):
         # Assert that the system exit code is 1 (indicating failure)
         self.assertEqual(cm.exception.code, 1)
 
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch('app.chirpstack_client.api.InternalServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.InternalServiceStub')
     def test_login_failure_Exception(self, mock_internal_service_stub, mock_insecure_channel):
         """
         Test the login method with a general exception
@@ -135,8 +135,8 @@ class TestListAllDevices(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
-    @patch('app.chirpstack_client.api.InternalServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.InternalServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_list_all_devices_happy_path(self, mock_insecure_channel, mock_internal_service_stub):
         """
         Test list_all_devices() method's happy path by mocking list_all_apps() reponse and List_agg_pagination()
@@ -159,8 +159,8 @@ class TestListAllDevices(unittest.TestCase):
             # Assert the result
             self.assertEqual(devices, ['device1', 'device2', 'device1', 'device2'])
 
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_list_all_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel):
         """
         Test list_all_devices() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
@@ -202,8 +202,8 @@ class TestListAllApps(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
-    @patch('app.chirpstack_client.api.InternalServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.InternalServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_list_all_apps_happy_path(self, mock_insecure_channel, mock_internal_service_stub):
         """
         Test list_all_apps() method's happy path by mocking list_tenants() reponse and List_agg_pagination()
@@ -225,8 +225,8 @@ class TestListAllApps(unittest.TestCase):
             # Assert the result
             self.assertEqual(apps, ['app1', 'app2', 'app1', 'app2'])
 
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_list_all_apps_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel):
         """
         Test list_all_apps() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
@@ -267,8 +267,8 @@ class TestListTenants(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
-    @patch('app.chirpstack_client.api.InternalServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.InternalServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_list_all_tenants_happy_path(self, mock_insecure_channel, mock_internal_service_stub):
         """
         Test list_tenants() method's happy path by mocking List_agg_pagination()
@@ -287,8 +287,8 @@ class TestListTenants(unittest.TestCase):
             # Assert the result
             self.assertEqual(tenants, ["Tenant1", "Tenant1"])
 
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_list_all_tenants_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel):
         """
         Test list_tenants() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
@@ -327,8 +327,8 @@ class TestGetDeviceProfile(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
-    @patch('app.chirpstack_client.api.DeviceProfileServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_profile_happy_path(self, mock_insecure_channel, mock_device_profile_service_stub):
         """
         Test get_device_profile() method's happy path
@@ -353,9 +353,9 @@ class TestGetDeviceProfile(unittest.TestCase):
         # Assert the result
         self.assertEqual(device_profile_info.device_profile_info, "mock_device_profile_info")
 
-    @patch('app.chirpstack_client.api.DeviceProfileServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_get_device_profile_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_profile_service_stub):
         """
         Test get_device_profile() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
@@ -399,8 +399,8 @@ class TestGetDeviceAppKey(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_app_key_happy_path_1(self, mock_insecure_channel, mock_device_service_stub):
         """
         Test get_device_app_key() method's happy path with lorawan version < 5
@@ -443,8 +443,8 @@ class TestGetDeviceAppKey(unittest.TestCase):
         # Assert the result
         self.assertEqual(app_key, "mock_nwk_key")
 
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_app_key_happy_path_2(self, mock_insecure_channel, mock_device_service_stub):
         """
         Test get_device_app_key() method's happy path with lorawan version = 5
@@ -487,8 +487,8 @@ class TestGetDeviceAppKey(unittest.TestCase):
         # Assert the result
         self.assertEqual(app_key, "mock_app_key")
 
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_app_key_failure_NOTFOUND(self, mock_insecure_channel, mock_device_service_stub):
         """
         Test the get_device_app_key() method with a RpcError exception with a grpc.StatusCode.NOT_FOUND
@@ -534,9 +534,9 @@ class TestGetDeviceAppKey(unittest.TestCase):
         # Assert the result
         self.assertIsNone(app_key)
 
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_get_device_app_key_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
         """
         Test get_device_app_key() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
@@ -582,8 +582,8 @@ class TestGetDeviceAppKey(unittest.TestCase):
         # assertations
         self.assertEqual(app_key, "mock_nwk_key")
 
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_app_key_failure_Other(self, mock_insecure_channel, mock_device_service_stub):
         """
         Test the get_device_app_key() method with a RpcError exception that gets catch by else in if statement
@@ -629,8 +629,8 @@ class TestGetDeviceAppKey(unittest.TestCase):
         self.assertIsNone(app_key)
 
 
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_app_key_failure_Exception(self, mock_insecure_channel, mock_device_service_stub):
         """
         Test the get_device_app_key() method with a general exception
@@ -682,8 +682,8 @@ class TestGetDeviceActivation(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
     
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_activation_happy_path(self, mock_insecure_channel, mock_device_service_stub):
         """
         Test get_device_activation() method's happy path
@@ -708,9 +708,9 @@ class TestGetDeviceActivation(unittest.TestCase):
         # Assert the result
         self.assertEqual(response.activation_details, "mock_activation_details")
 
-    @patch("app.chirpstack_client.api.DeviceServiceStub")
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_get_device_activation_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
         """
         Test get_device_activation() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
@@ -754,8 +754,8 @@ class TestListAggPagination(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_list_agg_pagination(self, mock_insecure_channel, mock_device_service_stub):
         """
         Test list_agg_pagination() method's happy path
@@ -791,8 +791,8 @@ class TestGetDevice(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
-    @patch('app.chirpstack_client.api.DeviceServiceStub')
-    @patch('app.chirpstack_client.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_happy_path(self, mock_insecure_channel, mock_device_service_stub):
         """
         Test get_device() method's happy path
@@ -818,9 +818,9 @@ class TestGetDevice(unittest.TestCase):
         # Assert the result
         self.assertEqual(device_info.device_info, "mock_device_info")
 
-    @patch("app.chirpstack_client.api.DeviceServiceStub")
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_get_device_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
         """
         Test get_device() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
@@ -864,9 +864,9 @@ class TestRefreshToken(unittest.TestCase):
         self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
         self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
-    @patch("app.chirpstack_client.api.DeviceServiceStub")
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_refresh_token_get_device(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
         """
         Test refresh token's happy path when used by ChirpstackClient.get_device()
@@ -899,9 +899,9 @@ class TestRefreshToken(unittest.TestCase):
         # assertations
         self.assertEqual(result, client.get_device(mock_dev_eui))
 
-    @patch("app.chirpstack_client.api.DeviceServiceStub")
-    @patch('app.chirpstack_client.grpc.insecure_channel')
-    @patch("app.chirpstack_client.time.sleep", return_value=None) #dont time.sleep() for test case
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_refresh_token_get_device_not_expired(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
         """
         Test refresh token's raised exception when used by ChirpstackClient.get_device()

@@ -318,6 +318,79 @@ class TestListTenants(unittest.TestCase):
         # Assert the result
         self.assertEqual(tenants, ["Tenant1", "Tenant1"])
 
+class TestGetDevice(unittest.TestCase):
+
+    def setUp(self):
+        # Mock the arguments
+        self.mock_args = Mock()
+        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
+        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
+        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
+
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_device_happy_path(self, mock_insecure_channel, mock_device_service_stub):
+        """
+        Test get_device() method's happy path
+        """
+
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the DeviceServiceStub
+        mock_device_service_stub_instance = mock_device_service_stub.return_value
+        mock_device_service_stub_instance.Get.return_value = Mock(device_info="mock_device_info")
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(self.mock_args)
+
+        # Mock the dev_eui
+        mock_dev_eui = "mock_dev_eui"
+
+        # Call get_device
+        device_info = client.get_device(mock_dev_eui)
+
+        # Assert the result
+        self.assertEqual(device_info.device_info, "mock_device_info")
+
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_get_device_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
+        """
+        Test get_device() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_rpc_error.details = lambda: 'ExpiredSignature'
+
+        # Mock the DeviceServiceStub
+        mock_device_service_stub_instance = mock_device_service_stub.return_value
+        mock_device_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(self.mock_args)
+
+        # Mock the dev_eui
+        mock_dev_eui = "mock_dev_eui"
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+
+            #mock refresh token successfully logging in and retrying the method in testing
+            with patch.object(client, "refresh_token", return_value="mock_device_info"):
+                # Call the method in testing
+                result = client.get_device(mock_dev_eui)
+
+        # assertations
+        self.assertEqual(result, "mock_device_info")
+
 class TestGetDeviceProfile(unittest.TestCase):
 
     def setUp(self):
@@ -781,79 +854,6 @@ class TestListAggPagination(unittest.TestCase):
 
         # Assert the result
         self.assertEqual(aggregated_records, ["result_page1", "result_page2"])
-
-class TestGetDevice(unittest.TestCase):
-
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
-
-    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
-    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
-    def test_get_device_happy_path(self, mock_insecure_channel, mock_device_service_stub):
-        """
-        Test get_device() method's happy path
-        """
-
-        # Mock the gRPC channel and login response
-        mock_channel = Mock()
-        mock_insecure_channel.return_value = mock_channel
-
-        # Mock the DeviceServiceStub
-        mock_device_service_stub_instance = mock_device_service_stub.return_value
-        mock_device_service_stub_instance.Get.return_value = Mock(device_info="mock_device_info")
-
-        # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
-
-        # Mock the dev_eui
-        mock_dev_eui = "mock_dev_eui"
-
-        # Call get_device
-        device_info = client.get_device(mock_dev_eui)
-
-        # Assert the result
-        self.assertEqual(device_info.device_info, "mock_device_info")
-
-    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
-    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
-    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
-    def test_get_device_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
-        """
-        Test get_device() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
-        """
-        # Mock the gRPC channel and login response
-        mock_channel = Mock()
-        mock_insecure_channel.return_value = mock_channel
-
-        # Mock the get_device method to raise grpc.RpcError()
-        mock_rpc_error = grpc.RpcError()
-        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
-        mock_rpc_error.details = lambda: 'ExpiredSignature'
-
-        # Mock the DeviceServiceStub
-        mock_device_service_stub_instance = mock_device_service_stub.return_value
-        mock_device_service_stub_instance.Get.side_effect = mock_rpc_error
-
-        # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
-
-        # Mock the dev_eui
-        mock_dev_eui = "mock_dev_eui"
-
-        # Mock the login method to return a dummy token
-        with patch.object(client, "login", return_value="dummy_token"):
-
-            #mock refresh token successfully logging in and retrying the method in testing
-            with patch.object(client, "refresh_token", return_value="mock_device_info"):
-                # Call the method in testing
-                result = client.get_device(mock_dev_eui)
-
-        # assertations
-        self.assertEqual(result, "mock_device_info")
 
 class TestRefreshToken(unittest.TestCase):
 

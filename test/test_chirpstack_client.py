@@ -1,7 +1,7 @@
 import unittest
 from pytest import mark
 from unittest.mock import Mock, patch, MagicMock
-from chirpstack_api_wrapper import ChirpstackClient
+from chirpstack_api_wrapper import ChirpstackClient,Gateway
 import grpc
 from grpc import _channel as channel
 from chirpstack_api import api
@@ -854,6 +854,109 @@ class TestListAggPagination(unittest.TestCase):
 
         # Assert the result
         self.assertEqual(aggregated_records, ["result_page1", "result_page2"])
+
+class TestCreateGateway(unittest.TestCase):
+
+    def setUp(self):
+        # Mock the arguments
+        self.mock_args = Mock()
+        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
+        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
+        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
+    
+    @patch('chirpstack_api_wrapper.api.GatewayServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_create_gw_happy_path(self, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test create_gateway() method's happy path
+        """
+
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+        mock_gw_service_stub_instance.Create.return_value = None
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(self.mock_args)
+
+        #Mock tags
+        mock_tags = {
+            "mock1": "test1",
+            "mock2": "test2"
+        }
+
+        # Mock Gateway
+        mock_gw = Gateway("mock","mock_gw_id","mock_tenant_id","mock description",mock_tags,45)
+
+        # Call create_gateway
+        return_val = client.create_gateway(mock_gw)
+
+        # Assert the result
+        self.assertEqual(return_val, None)
+
+    @patch('chirpstack_api_wrapper.api.GatewayServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_create_gw_no_Gateway(self, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test create_gateway() method's Gateway TypeError
+        """
+
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(self.mock_args)
+
+        # Mock Gateway
+        mock_gw = "mock" # NOT a Gateway Instance
+
+        # Call create_gateway and Assert Raise
+        with self.assertRaises(TypeError) as context:
+            client.create_gateway(mock_gw)
+
+    @patch("chirpstack_api_wrapper.api.GatewayServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_create_gw_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test create_gateway() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the create_gateway method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_rpc_error.details = lambda: 'ExpiredSignature'
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+        mock_gw_service_stub_instance.Create.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(self.mock_args)
+
+        # Mock Gateway
+        mock_gw = Gateway("mock","mock_gw_id","mock_tenant_id")
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+
+            #mock refresh token successfully logging in and retrying the method in testing
+            with patch.object(client, "refresh_token", return_value=None):
+                # Call the method in testing
+                return_val = client.create_gateway(mock_gw)
+
+        # assertations
+        self.assertEqual(return_val, None)
 
 class TestRefreshToken(unittest.TestCase):
 

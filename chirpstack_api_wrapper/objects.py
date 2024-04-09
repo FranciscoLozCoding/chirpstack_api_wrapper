@@ -4,7 +4,7 @@ class Gateway:
     """
     Definition of Gateway Object for Chirpstack
 
-    Parameters:
+    Params:
     - name: Name of the gateway.
     - gateway_id: Unique identifier for the gateway.
     - tenant_id: Identifier for the tenant associated with the gateway.

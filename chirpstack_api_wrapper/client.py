@@ -17,7 +17,8 @@ class ChirpstackClient:
     """
     Chirpstack client to call Api(s)
     """
-    def __init__(self, args):
+    def __init__(self, args): #TODO: switch to not use args, let the user define if they want to use args
+        """Constructor method to initialize a ChirpstackClient object."""   
         self.args = args
         self.server = self.args.chirpstack_api_interface
         self.channel = grpc.insecure_channel(self.server)
@@ -27,7 +28,7 @@ class ChirpstackClient:
 
     def login(self) -> str:
         """
-        Login to the server to get jwt auth token
+        Login to the server to get jwt auth token.
         """
         client = api.InternalServiceStub(self.channel)
 
@@ -67,7 +68,10 @@ class ChirpstackClient:
 
     def list_all_devices(self,app_resp: dict) -> dict:
         """
-        List all devices by inputting the response of self.list_all_apps()
+        List all devices.
+
+        Params:
+        - app_resp: Response of ChirpstackClient.list_all_apps().
         """
         client = api.DeviceServiceStub(self.channel)
 
@@ -92,7 +96,10 @@ class ChirpstackClient:
 
     def get_device(self, dev_eui: str) -> dict:
         """
-        Get device using deveui
+        Get device.
+
+        Params:
+        - dev_eui: unique identifier of the device.
         """
         client = api.DeviceServiceStub(self.channel)
 
@@ -110,7 +117,10 @@ class ChirpstackClient:
 
     def list_all_apps(self,tenant_resp: dict) -> dict:
         """
-        List all apps by inputting the response of self.list_tenants()
+        List all apps.
+
+        Params:
+        - tenant_resp: Response of ChirpstackClient.list_tenants().
         """
         client = api.ApplicationServiceStub(self.channel)
 
@@ -136,7 +146,7 @@ class ChirpstackClient:
 
     def list_tenants(self) -> dict:
         """
-        List all tenants
+        List all tenants.
         """
         client = api.TenantServiceStub(self.channel)
 
@@ -157,7 +167,10 @@ class ChirpstackClient:
 
     def get_device_profile(self,device_profile_id: str) -> dict:
         """
-        Get device profiles using profile id
+        Get device profile.
+
+        Params:
+        - device_profile_id: unique identifier of the device profile.
         """
         client = api.DeviceProfileServiceStub(self.channel)
 
@@ -175,10 +188,12 @@ class ChirpstackClient:
     
     def get_device_app_key(self,deveui: str,lw_v: int) -> str:
         """
-        Get device Application key using dev eui (Only OTAA)
+        Get device Application key (Only OTAA).
 
-        Parameters:
-        - lw_v: The lorawan version the device is using (input directly from get_device_profile() output)
+        Params:
+        - dev_eui: unique identifier of the device.
+        - lw_v: The lorawan version the device is using 
+            (input directly from ChirpstackClient.get_device_profile() output).
         """
         client = api.DeviceServiceStub(self.channel)
 
@@ -217,7 +232,10 @@ class ChirpstackClient:
 
     def get_device_activation(self,deveui: str) -> dict:
         """
-        Get Activation returns the current activation details of the device (OTAA or ABP) using deveui
+        Get Activation returns the current activation details of the device (OTAA or ABP).
+
+        Params:
+        - dev_eui: unique identifier of the device.
         """
         client = api.DeviceServiceStub(self.channel)
 
@@ -235,10 +253,10 @@ class ChirpstackClient:
 
     def create_gateway(self,gateway:Gateway) -> None:
         """
-        Create a Gateway
+        Create a Gateway.
 
-        Parameters:
-        - gateway: The gateway record to create 
+        Params:
+        - gateway: The gateway record to create.
         """
         if not isinstance(gateway, Gateway):
             raise TypeError("Expected Gateway object")
@@ -265,7 +283,7 @@ class ChirpstackClient:
     @staticmethod
     def List_agg_pagination(client,req,metadata) -> dict:
         """
-        This method aggregates all the result-sets in pagination from rpc List into one list
+        This method aggregates all the result-sets in pagination from rpc List into one list.
         """
         records=[]
         while True:
@@ -282,7 +300,13 @@ class ChirpstackClient:
     def refresh_token(self, e: grpc.RpcError, method, *args, **kwargs):
         """
         Handle exception of ExpiredSignature, by logging into the server to refresh the jwt auth token
-        and calling the method again that raised the exception
+        and calling the method again that raised the exception.
+
+        Params:
+        - e: The RpcError thrown.
+        - method: The ChirpstackClient method to call after the token is refreshed.
+        - *args: Arguments that will be inputted to method.
+        - **kwargs: Key Word Arguments that will be inputted to method.
         """
         # Handle the exception here
         status_code = e.code()

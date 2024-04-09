@@ -5,3 +5,4 @@ omit =
   test_*.py,
   tests_*.py,
   *_tests.py,
+  example.py

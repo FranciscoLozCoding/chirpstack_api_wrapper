@@ -1,7 +1,7 @@
 import argparse
 from chirpstack_api_wrapper import *
 
-def main(): # pragma: no cover
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", help="enable debug logs")
     parser.add_argument(
@@ -31,4 +31,4 @@ def main(): # pragma: no cover
     print(chirpstack_client.list_tenants())
 
 if __name__ == "__main__":
-    main() # pragma: no cover
+    main()

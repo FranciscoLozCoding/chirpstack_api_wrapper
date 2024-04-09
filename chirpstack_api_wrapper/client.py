@@ -3,7 +3,6 @@ import grpc
 import logging
 import sys
 import os
-import argparse
 import time
 from grpc import _channel as channel
 from chirpstack_api import api
@@ -15,15 +14,19 @@ OFFSET = LIMIT #Offset in the result-set (setting offset=limit goes to the next 
 
 class ChirpstackClient:
     """
-    Chirpstack client to call Api(s)
+    Chirpstack client to call Api(s).
+
+    Params:
+    - email: The email of the Account that will be used to call the Api(s).
+    - password: The password of the Account that will be used to call the Api(s).
+    - api_endpoint: The Chirpstack grpc api endpoint (usually port 8080).
     """
-    def __init__(self, args): #TODO: switch to not use args, let the user define if they want to use args
+    def __init__(self, email:str, password:str, api_endpoint:str):
         """Constructor method to initialize a ChirpstackClient object."""   
-        self.args = args
-        self.server = self.args.chirpstack_api_interface
+        self.server = api_endpoint
         self.channel = grpc.insecure_channel(self.server)
-        self.email = self.args.chirpstack_account_email
-        self.password = self.args.chirpstack_account_password
+        self.email = email
+        self.password = password
         self.auth_token = self.login()
 
     def login(self) -> str:

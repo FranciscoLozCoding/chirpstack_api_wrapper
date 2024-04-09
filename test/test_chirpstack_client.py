@@ -1,7 +1,8 @@
 import unittest
 from pytest import mark
 from unittest.mock import Mock, patch, MagicMock
-from chirpstack_api_wrapper import ChirpstackClient,Gateway
+from chirpstack_api_wrapper.client import * 
+from chirpstack_api_wrapper.objects import * 
 import grpc
 from grpc import _channel as channel
 from chirpstack_api import api

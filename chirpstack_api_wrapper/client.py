@@ -233,7 +233,6 @@ class ChirpstackClient:
         except grpc.RpcError as e:
             return self.refresh_token(e, self.get_device_activation, deveui)
 
-    #TODO
     def create_gateway(self,gateway:Gateway) -> None:
         """
         Create a Gateway
@@ -243,7 +242,7 @@ class ChirpstackClient:
         """
         if not isinstance(gateway, Gateway):
             raise TypeError("Expected Gateway object")
-            
+
         client = api.GatewayServiceStub(self.channel)
 
         # Define the JWT key metadata.

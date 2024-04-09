@@ -1,3 +1,4 @@
+import argparse
 from chirpstack_api_wrapper import *
 
 def main(): # pragma: no cover
@@ -25,9 +26,9 @@ def main(): # pragma: no cover
         format="%(asctime)s %(message)s",
         datefmt="%Y/%m/%d %H:%M:%S",
     )
-    chirpstack_client = ChirpstackClient(args)
+    chirpstack_client = ChirpstackClient(args.chirpstack_account_email,args.chirpstack_account_password,args.chirpstack_api_interface)
 
-    chirpstack_client.list_tenants()
+    print(chirpstack_client.list_tenants())
 
 if __name__ == "__main__":
     main() # pragma: no cover

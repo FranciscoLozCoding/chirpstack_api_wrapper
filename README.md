@@ -4,30 +4,11 @@ An abstraction layer over the `chirpstack_api` python library. Implements `Chirp
 ## Using ChirpstackClient
 ```py
 from chirpstack_api_wrapper import ChirpstackClient
-import argparse
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--chirpstack-account-email",
-        default=os.getenv("CHIRPSTACK_ACCOUNT_EMAIL"),
-        help="The Chirpstack Account's email to use to access APIs",
-    )
-    parser.add_argument(
-        "--chirpstack-account-password",
-        default=os.getenv("CHIRPSTACK_ACCOUNT_PASSWORD"),
-        help="The Chirpstack Account's password to use to access APIs",
-    )
-    parser.add_argument(
-        "--chirpstack-api-interface",
-        default=os.getenv("CHIRPSTACK_API_INTERFACE"),
-        help="Chirpstack's server API interface. The port is usually 8080",
-    )
-    args = parser.parse_args()
+    chirpstack_client = ChirpstackClient("mock_email","mock_password","localhost:8080")
 
-    chirpstack_client = ChirpstackClient(args)
-
-    chirpstack_client.list_tenants()
+    print(chirpstack_client.list_tenants())
 
 if __name__ == "__main__":
     main() 

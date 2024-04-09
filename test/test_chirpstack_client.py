@@ -20,8 +20,31 @@ class TestLogin(unittest.TestCase):
     @patch('chirpstack_api_wrapper.api.InternalServiceStub')
     def test_login_success(self, mock_internal_service_stub, mock_insecure_channel):
         """
-        Test a succesful pass through of login
+        Test a successful pass through of login
         """
+
+        # Mocking grpc login response
+        mock_login_response = MagicMock(jwt='mock_jwt_token')
+        mock_internal_service_stub.return_value.Login.return_value = mock_login_response
+
+        # Creating ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Assert that the login method was called with the correct parameters
+        mock_internal_service_stub.return_value.Login.assert_called_once_with(
+            api.LoginRequest(email=CHIRPSTACK_ACT_EMAIL, password=CHIRPSTACK_ACT_PASSWORD)
+        )
+
+        # Assert that the auth_token is set correctly
+        self.assertEqual(client.auth_token, 'mock_jwt_token')
+
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch('chirpstack_api_wrapper.api.InternalServiceStub')
+    def test_login_success_using_argparse(self, mock_internal_service_stub, mock_insecure_channel):
+        """
+        Test a successful pass through of login using argparse
+        """
+        #Mock argparse
         args = MagicMock()
         args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
         args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
@@ -32,7 +55,7 @@ class TestLogin(unittest.TestCase):
         mock_internal_service_stub.return_value.Login.return_value = mock_login_response
 
         # Creating ChirpstackClient instance
-        client = ChirpstackClient(args)
+        client = ChirpstackClient(args.chirpstack_account_email, args.chirpstack_account_password, args.chirpstack_api_interface)
 
         # Assert that the login method was called with the correct parameters
         mock_internal_service_stub.return_value.Login.assert_called_once_with(
@@ -48,11 +71,6 @@ class TestLogin(unittest.TestCase):
         """
         Test the login method with a RpcError exception with a grpc.StatusCode.UNAVAILABLE
         """
-        args = MagicMock()
-        args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
-
         # Mocking grpc login response
         mock_rpc_error = grpc.RpcError()
         mock_rpc_error.code = lambda: grpc.StatusCode.UNAVAILABLE
@@ -63,7 +81,7 @@ class TestLogin(unittest.TestCase):
         with self.assertLogs(level='ERROR') as log:
             # Creating ChirpstackClient instance
             with self.assertRaises(SystemExit) as cm:
-                ChirpstackClient(args)
+                ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
             self.assertEqual(len(log.output), 2)
             self.assertEqual(len(log.records), 2)
             self.assertIn("Service is unavailable. This might be a DNS resolution issue.", log.output[0])
@@ -77,11 +95,6 @@ class TestLogin(unittest.TestCase):
         """
         Test the login method with a RpcError exception with a grpc.StatusCode.UNAUTHENTICATED
         """
-        args = MagicMock()
-        args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        args.chirpstack_account_password = 'wrong_password'
-
         # Mocking grpc login response
         mock_rpc_error = grpc.RpcError()
         mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
@@ -92,7 +105,7 @@ class TestLogin(unittest.TestCase):
         with self.assertLogs(level='ERROR') as log:
             # Creating ChirpstackClient instance
             with self.assertRaises(SystemExit) as cm:
-                ChirpstackClient(args)
+                ChirpstackClient(CHIRPSTACK_ACT_EMAIL, 'wrong_password', CHIRPSTACK_API_INTERFACE)
             self.assertEqual(len(log.output), 2)
             self.assertEqual(len(log.records), 2)
             self.assertIn(f"An error occurred with status code {grpc.StatusCode.UNAUTHENTICATED}", log.output[0])
@@ -106,11 +119,6 @@ class TestLogin(unittest.TestCase):
         """
         Test the login method with a general exception
         """
-        args = MagicMock()
-        args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
-
         # Mocking grpc login response to raise a general Exception
         e = Exception("Test exception")
         mock_internal_service_stub.return_value.Login.side_effect = e
@@ -119,7 +127,7 @@ class TestLogin(unittest.TestCase):
         with self.assertLogs(level='ERROR') as log:
             # Creating ChirpstackClient instance
             with self.assertRaises(SystemExit) as cm:
-                ChirpstackClient(args)
+                ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
             self.assertIn(f"An error occurred: {e}", log.output[0])
@@ -128,13 +136,6 @@ class TestLogin(unittest.TestCase):
         self.assertEqual(cm.exception.code, 1)
 
 class TestListAllDevices(unittest.TestCase):
-
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
     @patch('chirpstack_api_wrapper.api.InternalServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
@@ -147,7 +148,7 @@ class TestListAllDevices(unittest.TestCase):
         mock_list_agg_pagination = Mock(return_value=["device1", "device2"]) #Example
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         with patch.object(client, 'List_agg_pagination', mock_list_agg_pagination):
 
@@ -176,7 +177,7 @@ class TestListAllDevices(unittest.TestCase):
         mock_list_agg_pagination.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         with patch.object(client, 'List_agg_pagination', mock_list_agg_pagination):
 
@@ -196,12 +197,6 @@ class TestListAllDevices(unittest.TestCase):
         self.assertEqual(result, ['device1', 'device2', 'device1', 'device2'])
 
 class TestListAllApps(unittest.TestCase):
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
     @patch('chirpstack_api_wrapper.api.InternalServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
@@ -215,7 +210,7 @@ class TestListAllApps(unittest.TestCase):
 
         with patch.object(ChirpstackClient, 'List_agg_pagination', mock_list_agg_pagination):
             # Create a ChirpstackClient instance
-            client = ChirpstackClient(self.mock_args)
+            client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
             # Mock the tenant_resp for list_all_devices
             mock_tenant_resp = [Mock(id="tenant1"), Mock(id="tenant2")]
@@ -242,7 +237,7 @@ class TestListAllApps(unittest.TestCase):
         mock_list_agg_pagination.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         with patch.object(client, 'List_agg_pagination', mock_list_agg_pagination):
 
@@ -261,12 +256,6 @@ class TestListAllApps(unittest.TestCase):
         self.assertEqual(result, ['app1', 'app2', 'app1', 'app2'])
 
 class TestListTenants(unittest.TestCase):
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
     @patch('chirpstack_api_wrapper.api.InternalServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
@@ -280,7 +269,7 @@ class TestListTenants(unittest.TestCase):
 
         with patch.object(ChirpstackClient, 'List_agg_pagination', mock_list_agg_pagination):
             # Create a ChirpstackClient instance
-            client = ChirpstackClient(self.mock_args)
+            client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
             # Call list_tenants()
             tenants = client.list_tenants()
@@ -304,7 +293,7 @@ class TestListTenants(unittest.TestCase):
         mock_list_agg_pagination.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         with patch.object(client, 'List_agg_pagination', mock_list_agg_pagination):
 
@@ -320,13 +309,6 @@ class TestListTenants(unittest.TestCase):
         self.assertEqual(tenants, ["Tenant1", "Tenant1"])
 
 class TestGetDevice(unittest.TestCase):
-
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
     @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
@@ -344,7 +326,7 @@ class TestGetDevice(unittest.TestCase):
         mock_device_service_stub_instance.Get.return_value = Mock(device_info="mock_device_info")
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the dev_eui
         mock_dev_eui = "mock_dev_eui"
@@ -376,7 +358,7 @@ class TestGetDevice(unittest.TestCase):
         mock_device_service_stub_instance.Get.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the dev_eui
         mock_dev_eui = "mock_dev_eui"
@@ -394,13 +376,6 @@ class TestGetDevice(unittest.TestCase):
 
 class TestGetDeviceProfile(unittest.TestCase):
 
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
-
     @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_get_device_profile_happy_path(self, mock_insecure_channel, mock_device_profile_service_stub):
@@ -416,7 +391,7 @@ class TestGetDeviceProfile(unittest.TestCase):
         mock_device_profile_service_stub_instance.Get.return_value = Mock(device_profile_info="mock_device_profile_info")
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the device profile ID
         mock_device_profile_id = "mock_device_profile_id"
@@ -448,7 +423,7 @@ class TestGetDeviceProfile(unittest.TestCase):
         mock_device_profile_service_stub_instance.Get.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the device profile ID
         mock_device_profile_id = "mock_device_profile_id"
@@ -465,13 +440,6 @@ class TestGetDeviceProfile(unittest.TestCase):
         self.assertEqual(device_profile_info, "mock_device_profile_info")
 
 class TestGetDeviceAppKey(unittest.TestCase):
-
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
     @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
@@ -495,7 +463,7 @@ class TestGetDeviceAppKey(unittest.TestCase):
         mock_device_service_stub_instance.GetKeys.return_value = mock_device_keys
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock get_device_profile response
         deviceprofile_resp = { 
@@ -539,7 +507,7 @@ class TestGetDeviceAppKey(unittest.TestCase):
         mock_device_service_stub_instance.GetKeys.return_value = mock_device_keys
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock get_device_profile response
         deviceprofile_resp = { 
@@ -581,7 +549,7 @@ class TestGetDeviceAppKey(unittest.TestCase):
         mock_device_service_stub_instance.GetKeys.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock get_device_profile response
         deviceprofile_resp = { 
@@ -629,7 +597,7 @@ class TestGetDeviceAppKey(unittest.TestCase):
         mock_device_service_stub_instance.GetKeys.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock get_device_profile response
         deviceprofile_resp = { 
@@ -675,7 +643,7 @@ class TestGetDeviceAppKey(unittest.TestCase):
         mock_device_service_stub_instance.GetKeys.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock get_device_profile response
         deviceprofile_resp = { 
@@ -720,7 +688,7 @@ class TestGetDeviceAppKey(unittest.TestCase):
         mock_device_service_stub_instance.GetKeys.side_effect = e
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock get_device_profile response
         deviceprofile_resp = { 
@@ -748,13 +716,6 @@ class TestGetDeviceAppKey(unittest.TestCase):
         self.assertIsNone(app_key)
 
 class TestGetDeviceActivation(unittest.TestCase):
-
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
     
     @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
@@ -771,7 +732,7 @@ class TestGetDeviceActivation(unittest.TestCase):
         mock_device_service_stub_instance.GetActivation.return_value = Mock(activation_details="mock_activation_details")
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the dev_eui
         mock_dev_eui = "mock_dev_eui"
@@ -803,7 +764,7 @@ class TestGetDeviceActivation(unittest.TestCase):
         mock_device_service_stub_instance.GetActivation.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the dev_eui
         mock_dev_eui = "mock_dev_eui"
@@ -821,13 +782,6 @@ class TestGetDeviceActivation(unittest.TestCase):
 
 class TestListAggPagination(unittest.TestCase):
 
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
-
     @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     def test_list_agg_pagination(self, mock_insecure_channel, mock_device_service_stub):
@@ -844,7 +798,7 @@ class TestListAggPagination(unittest.TestCase):
         mock_device_service_stub_instance.List.return_value = mock_list_response
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the request and metadata
         mock_req = Mock(offset=0,limit=1)
@@ -857,13 +811,6 @@ class TestListAggPagination(unittest.TestCase):
         self.assertEqual(aggregated_records, ["result_page1", "result_page2"])
 
 class TestCreateGateway(unittest.TestCase):
-
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
     
     @patch('chirpstack_api_wrapper.api.GatewayServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
@@ -881,7 +828,7 @@ class TestCreateGateway(unittest.TestCase):
         mock_gw_service_stub_instance.Create.return_value = None
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         #Mock tags
         mock_tags = {
@@ -913,7 +860,7 @@ class TestCreateGateway(unittest.TestCase):
         mock_gw_service_stub_instance = mock_gw_service_stub.return_value
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock Gateway
         mock_gw = "mock" # NOT a Gateway Instance
@@ -943,7 +890,7 @@ class TestCreateGateway(unittest.TestCase):
         mock_gw_service_stub_instance.Create.side_effect = mock_rpc_error
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock Gateway
         mock_gw = Gateway("mock","mock_gw_id","mock_tenant_id")
@@ -960,13 +907,6 @@ class TestCreateGateway(unittest.TestCase):
         self.assertEqual(return_val, None)
 
 class TestRefreshToken(unittest.TestCase):
-
-    def setUp(self):
-        # Mock the arguments
-        self.mock_args = Mock()
-        self.mock_args.chirpstack_api_interface = CHIRPSTACK_API_INTERFACE
-        self.mock_args.chirpstack_account_email = CHIRPSTACK_ACT_EMAIL
-        self.mock_args.chirpstack_account_password = CHIRPSTACK_ACT_PASSWORD
 
     @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
@@ -985,7 +925,7 @@ class TestRefreshToken(unittest.TestCase):
         mock_device_service_stub_instance.Get.return_value = Mock(device_info="mock_device_info")
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the dev_eui
         mock_dev_eui = "mock_dev_eui"
@@ -1020,7 +960,7 @@ class TestRefreshToken(unittest.TestCase):
         mock_device_service_stub_instance.Get.return_value = Mock(device_info="mock_device_info")
 
         # Create a ChirpstackClient instance
-        client = ChirpstackClient(self.mock_args)
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
 
         # Mock the dev_eui
         mock_dev_eui = "mock_dev_eui"

@@ -1,3 +1,4 @@
+"""Abstraction layer over chirpstack_api"""
 import grpc
 import logging
 import sys
@@ -6,6 +7,7 @@ import argparse
 import time
 from grpc import _channel as channel
 from chirpstack_api import api
+from objects import *
 
 #Pagination
 LIMIT = 100 #Max number of records to return in the result-set.
@@ -174,7 +176,9 @@ class ChirpstackClient:
     def get_device_app_key(self,deveui: str,lw_v: int) -> str:
         """
         Get device Application key using dev eui (Only OTAA)
-        lw_v: The lorawan version the device is using (input directly from get_device_profile() output)
+
+        Parameters:
+        - lw_v: The lorawan version the device is using (input directly from get_device_profile() output)
         """
         client = api.DeviceServiceStub(self.channel)
 
@@ -227,7 +231,37 @@ class ChirpstackClient:
         try:
             return client.GetActivation(req, metadata=metadata)
         except grpc.RpcError as e:
-            return self.refresh_token(e, self.get_device_activation, deveui)   
+            return self.refresh_token(e, self.get_device_activation, deveui)
+
+    #TODO
+    def create_gateway(self,gateway:Gateway) -> None:
+        """
+        Create a Gateway
+
+        Parameters:
+        - gateway: The gateway record to create 
+        """
+        if not isinstance(gateway, Gateway):
+            raise TypeError("Expected Gateway object")
+            
+        client = api.GatewayServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.CreateGatewayRequest()
+        req.gateway.gateway_id = gateway.gateway_id
+        req.gateway.name = gateway.name
+        req.gateway.description = gateway.description
+        req.gateway.tenant_id = gateway.tenant_id
+        req.gateway.stats_interval = gateway.stats_interval
+        req.gateway.tags.update(gateway.tags)
+
+        try:
+            return client.Create(req, metadata=metadata)
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.create_gateway, gateway)
 
     @staticmethod
     def List_agg_pagination(client,req,metadata) -> dict:
@@ -264,7 +298,7 @@ class ChirpstackClient:
 
         logging.error(f"ChirpstackClient.{method.__name__}(): Unknown error occurred with status code {status_code}")
         logging.error(f"    Details: {details}")
-        raise Exception(f"The JWT token failed to be refreshed") #program will terminate and pod will restart
+        raise Exception(f"The JWT token failed to be refreshed")
 
 def main(): # pragma: no cover
     parser = argparse.ArgumentParser()

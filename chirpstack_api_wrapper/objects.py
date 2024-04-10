@@ -39,6 +39,18 @@ class RegParamsRevision(Enum):
     RP002_1_0_2 = 4
     RP002_1_0_3 = 5
 
+class CodecRuntime(Enum):
+    """Definition of CodecRuntime Object for Chirpstack."""
+    NONE = 0
+    CAYENNE_LPP = 1
+    JS = 2
+
+class AdrAlgorithm(Enum):
+    """Definition of ADR Algorithm Object."""
+    LORA_ONLY = "default"
+    LR_FHSS_ONLY = "lr_fhss"
+    BOTH = "lora_lr_fhss"
+
 class Gateway:
     """
     Definition of Gateway Object for Chirpstack
@@ -79,7 +91,6 @@ class DeviceProfile:
     - region: The frequency plan the devices will be using.
     - mac_version: The LoRaWAN MAC version supported by the devices.
     - reg_params_revision: Revision of the Regional Parameters specification supported by the devices.
-    - adr_algorithm_id: The ADR algorithm that will be used for controlling the devices data-rate.
     - uplink_interval: The expected interval in seconds in which the devices send uplink messages. 
         This is used to determine if the devices are active or inactive.
     - supports_otaa: The devices support OTAA.
@@ -105,15 +116,17 @@ class DeviceProfile:
     - tags (dict<string,string>, optional): Additional metadata associated with the device profile.
     - auto_detect_measurements (optional): Auto detect measurements from these devices in Chirpstack.
     - allow_roaming (optional): This allows the devices to use roaming. Roaming must also be configured in the server.
+    - adr_algorithm_id (optional): The ADR algorithm that will be used for controlling the devices data-rate.
     """
-    def __init__(self,name:str,tenant_id:str,region:Region,mac_version:MacVersion,reg_params_revision,adr_algorithm_id:str,
+    def __init__(self,name:str,tenant_id:str,region:Region,mac_version:MacVersion,reg_params_revision:RegParamsRevision,
         uplink_interval:int,supports_otaa:bool,supports_class_b:bool,supports_class_c:bool,abp_rx1_delay:int=None,
         abp_rx1_dr_offset:int=None,abp_rx2_dr:int=None,abp_rx2_freq:int=None,class_b_timeout:int=None,
         class_b_ping_slot_nb_k:int=None,class_b_ping_slot_dr:int=None,class_b_ping_slot_freq:int=None,
-        class_c_timeout:int=None,id:str="",description:str='',payload_codec_runtime=None,payload_codec_script:str="",
-        flush_queue_on_activate:bool=True,device_status_req_interval:int=1,tags:dict={},
-        auto_detect_measurements:bool=True,allow_roaming:bool=False):
+        class_c_timeout:int=None,id:str="",description:str='',payload_codec_runtime:CodecRuntime=CodecRuntime.NONE,
+        payload_codec_script:str="",flush_queue_on_activate:bool=True,device_status_req_interval:int=1,tags:dict={},
+        auto_detect_measurements:bool=True,allow_roaming:bool=False,adr_algorithm_id:AdrAlgorithm=AdrAlgorithm.LORA_ONLY):
         """Constructor method to initialize a Gateway object."""
+        
         if not all(isinstance(value, str) for value in tags.values()):
             raise ValueError("DeviceProfile: All values in 'tags' dictionary must be strings.")           
 
@@ -122,8 +135,7 @@ class DeviceProfile:
         self.tenant_id = tenant_id
         self.region = region
         self.mac_version = mac_version
-        self.reg_params_revision = reg_params_revision #TODO:Actual type is common.reg_params_revision
-        self.adr_algorithm_id = adr_algorithm_id #TODO:Record type, create an object for this?
+        self.reg_params_revision = reg_params_revision
         self.uplink_interval = uplink_interval
         self.supports_otaa = supports_otaa
         self.abp_rx1_delay = abp_rx1_delay
@@ -138,13 +150,14 @@ class DeviceProfile:
         self.supports_class_c = supports_class_c
         self.class_c_timeout = class_c_timeout
         self.description = description
-        self.payload_codec_runtime = payload_codec_runtime #TODO:Actual type is CodecRuntime
+        self.payload_codec_runtime = payload_codec_runtime
         self.payload_codec_script = payload_codec_script
         self.flush_queue_on_activate = flush_queue_on_activate
         self.device_status_req_interval = device_status_req_interval
         self.tags = tags
         self.auto_detect_measurements = auto_detect_measurements
         self.allow_roaming = allow_roaming
+        self.adr_algorithm_id = adr_algorithm_id
         # configure later if needed:
         # self.measurements
         # self.region_config_id

@@ -1,5 +1,4 @@
 """Definitions of Objects that are used in Chirpstack"""
-#TODO: add a str method for all objects returning the unique identifier
 
 class Gateway:
     """
@@ -7,7 +6,7 @@ class Gateway:
 
     Params:
     - name: Name of the gateway.
-    - gateway_id: Unique identifier for the gateway.
+    - gateway_id (EUI64): Unique identifier for the gateway.
     - tenant_id: Identifier for the tenant associated with the gateway.
     - description (optional): Description of the gateway.
     - tags (dict<string,string>, optional): Additional metadata associated with the gateway.
@@ -25,6 +24,10 @@ class Gateway:
         self.tags = tags
         self.stats_interval = stats_interval
         # self.location = None # configure later if needed
+    
+    def __str__(self):
+        """String representation of the Gateway object"""
+        return self.gateway_id
 
 class Device:
     """
@@ -65,3 +68,7 @@ class Device:
         self.is_disabled = is_disabled
         self.tags = tags
         self.variables = variables
+
+    def __str__(self):
+        """String representation of the Device object"""
+        return self.dev_eui

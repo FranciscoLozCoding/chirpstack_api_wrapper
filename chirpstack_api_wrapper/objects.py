@@ -101,8 +101,8 @@ class Application:
         
         self.id = id
         self.name = name
-        self.description = description
         self.tenant_id = tenant_id
+        self.description = description
         self.tags = tags
 
     def __str__(self):

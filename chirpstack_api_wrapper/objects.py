@@ -126,10 +126,10 @@ class DeviceProfile:
     - supports_otaa: The devices support OTAA.
     - supports_class_b: The devices support Class-B configurations.
     - supports_class_c: The devices support Class-C configurations.
-    - abp_rx1_delay (required if supports_otaa): The devices' RX1 delay (for ABP).
-    - abp_rx1_dr_offset (required if supports_otaa): The devices' RX1 DR offset (for ABP).
-    - abp_rx2_dr (required if supports_otaa): The devices' RX2 DR (for ABP).
-    - abp_rx2_freq (required if supports_otaa): The devices' RX2 frequency (for ABP, Hz).
+    - abp_rx1_delay (required if not supports_otaa): The devices' RX1 delay (for ABP).
+    - abp_rx1_dr_offset (required if not supports_otaa): The devices' RX1 DR offset (for ABP).
+    - abp_rx2_dr (required if not supports_otaa): The devices' RX2 DR (for ABP).
+    - abp_rx2_freq (required if not supports_otaa): The devices' RX2 frequency (for ABP, Hz).
     - class_b_timeout (required if supports_class_b): The devices' Class-B timeout in seconds for confirmed downlink transmissions.
     - class_b_ping_slot_nb_k (required if supports_class_b): The devices' Class-B ping-slots per beacon period.
     - class_b_ping_slot_dr (required if supports_class_b): The devices' Class-B ping-slot data rate.
@@ -163,31 +163,31 @@ class DeviceProfile:
         self.id = id
         self.name = name
         self.tenant_id = tenant_id
-        self.region = region
-        self.mac_version = mac_version
-        self.reg_params_revision = reg_params_revision
+        self.region = region.value
+        self.mac_version = mac_version.value
+        self.reg_params_revision = reg_params_revision.value
         self.uplink_interval = uplink_interval
         self.supports_otaa = supports_otaa
-        self.abp_rx1_delay = abp_rx1_delay
-        self.abp_rx1_dr_offset = abp_rx1_dr_offset
-        self.abp_rx2_dr = abp_rx2_dr
-        self.abp_rx2_freq = abp_rx2_freq
+        self._abp_rx1_delay = abp_rx1_delay;self.abp_rx1_delay
+        self._abp_rx1_dr_offset = abp_rx1_dr_offset;self.abp_rx1_dr_offset
+        self._abp_rx2_dr = abp_rx2_dr;self.abp_rx2_dr
+        self._abp_rx2_freq = abp_rx2_freq;self.abp_rx2_freq
         self.supports_class_b = supports_class_b
-        self.class_b_timeout = class_b_timeout
-        self.class_b_ping_slot_nb_k = class_b_ping_slot_nb_k
-        self.class_b_ping_slot_dr = class_b_ping_slot_dr
-        self.class_b_ping_slot_freq = class_b_ping_slot_freq
+        self._class_b_timeout = class_b_timeout;self.class_b_timeout
+        self._class_b_ping_slot_nb_k = class_b_ping_slot_nb_k;self.class_b_ping_slot_nb_k
+        self._class_b_ping_slot_dr = class_b_ping_slot_dr;self.class_b_ping_slot_dr
+        self._class_b_ping_slot_freq = class_b_ping_slot_freq;self.class_b_ping_slot_freq
         self.supports_class_c = supports_class_c
-        self.class_c_timeout = class_c_timeout
+        self._class_c_timeout = class_c_timeout;self.class_c_timeout
         self.description = description
-        self.payload_codec_runtime = payload_codec_runtime
+        self.payload_codec_runtime = payload_codec_runtime.value
         self.payload_codec_script = payload_codec_script
         self.flush_queue_on_activate = flush_queue_on_activate
         self.device_status_req_interval = device_status_req_interval
         self.tags = tags
         self.auto_detect_measurements = auto_detect_measurements
         self.allow_roaming = allow_roaming
-        self.adr_algorithm_id = adr_algorithm_id
+        self.adr_algorithm_id = adr_algorithm_id.value
         # configure later if needed:
         # self.measurements
         # self.region_config_id
@@ -217,57 +217,111 @@ class DeviceProfile:
 
     @property 
     def abp_rx1_delay(self):
-        if not self.supports_otaa and self.abp_rx1_delay is None:
+        if not self.supports_otaa and self._abp_rx1_delay is None:
             raise ValueError("DeviceProfile: abp_rx1_delay is required when supports_otaa is False")
-        return self.abp_rx1_delay
+        return self._abp_rx1_delay
+
+    @abp_rx1_delay.setter
+    def abp_rx1_delay(self, value):
+        if not self.supports_otaa and value is None:
+            raise ValueError("DeviceProfile: abp_rx1_delay is required when supports_otaa is False")
+        self._abp_rx1_delay = value
 
     @property 
     def abp_rx1_dr_offset(self):
-        if not self.supports_otaa and self.abp_rx1_dr_offset is None:
+        if not self.supports_otaa and self._abp_rx1_dr_offset is None:
             raise ValueError("DeviceProfile: abp_rx1_dr_offset is required when supports_otaa is False")
-        return self.abp_rx1_dr_offset
+        return self._abp_rx1_dr_offset
+
+    @abp_rx1_dr_offset.setter
+    def abp_rx1_dr_offset(self, value):
+        if not self.supports_otaa and value is None:
+            raise ValueError("DeviceProfile: abp_rx1_dr_offset is required when supports_otaa is False")
+        self._abp_rx1_dr_offset = value
 
     @property
     def abp_rx2_dr(self):
-        if not self.supports_otaa and self.abp_rx2_dr is None:
+        if not self.supports_otaa and self._abp_rx2_dr is None:
             raise ValueError("DeviceProfile: abp_rx2_dr is required when supports_otaa is False")
-        return self.abp_rx2_dr
+        return self._abp_rx2_dr
+
+    @abp_rx2_dr.setter
+    def abp_rx2_dr(self, value):
+        if not self.supports_otaa and value is None:
+            raise ValueError("DeviceProfile: abp_rx2_dr is required when supports_otaa is False")
+        self._abp_rx2_dr = value
 
     @property
     def abp_rx2_freq(self):
-        if not self.supports_otaa and self.abp_rx2_freq is None:
+        if not self.supports_otaa and self._abp_rx2_freq is None:
             raise ValueError("DeviceProfile: abp_rx2_freq is required when supports_otaa is False")
-        return self.abp_rx2_freq
+        return self._abp_rx2_freq
+
+    @abp_rx2_freq.setter
+    def abp_rx2_freq(self, value):
+        if not self.supports_otaa and value is None:
+            raise ValueError("DeviceProfile: abp_rx2_freq is required when supports_otaa is False")
+        self._abp_rx2_freq = value
 
     @property
     def class_b_timeout(self):
-        if self.supports_class_b and self.class_b_timeout is None:
+        if self.supports_class_b and self._class_b_timeout is None:
             raise ValueError("DeviceProfile: class_b_timeout is required when supports_class_b is True")
-        return self.class_b_timeout
+        return self._class_b_timeout
+
+    @class_b_timeout.setter
+    def class_b_timeout(self, value):
+        if self.supports_class_b and value is None:
+            raise ValueError("DeviceProfile: class_b_timeout is required when supports_class_b is True")
+        self._class_b_timeout = value
 
     @property  
     def class_b_ping_slot_nb_k(self):
-        if self.supports_class_b and self.class_b_ping_slot_nb_k is None:
+        if self.supports_class_b and self._class_b_ping_slot_nb_k is None:
             raise ValueError("DeviceProfile: class_b_ping_slot_nb_k is required when supports_class_b is True")
-        return self.class_b_ping_slot_nb_k
+        return self._class_b_ping_slot_nb_k
+
+    @class_b_ping_slot_nb_k.setter
+    def class_b_ping_slot_nb_k(self, value):
+        if self.supports_class_b and value is None:
+            raise ValueError("DeviceProfile: class_b_ping_slot_nb_k is required when supports_class_b is True")
+        self._class_b_ping_slot_nb_k = value
 
     @property 
     def class_b_ping_slot_dr(self):
-        if self.supports_class_b and self.class_b_ping_slot_dr is None:
+        if self.supports_class_b and self._class_b_ping_slot_dr is None:
             raise ValueError("DeviceProfile: class_b_ping_slot_dr is required when supports_class_b is True")
-        return self.class_b_ping_slot_dr
+        return self._class_b_ping_slot_dr
+
+    @class_b_ping_slot_dr.setter
+    def class_b_ping_slot_dr(self, value):
+        if self.supports_class_b and value is None:
+            raise ValueError("DeviceProfile: class_b_ping_slot_dr is required when supports_class_b is True")
+        self._class_b_ping_slot_dr = value
 
     @property 
     def class_b_ping_slot_freq(self):
-        if self.supports_class_b and self.class_b_ping_slot_freq is None:
+        if self.supports_class_b and self._class_b_ping_slot_freq is None:
             raise ValueError("DeviceProfile: class_b_ping_slot_freq is required when supports_class_b is True")
-        return self.class_b_ping_slot_freq
+        return self._class_b_ping_slot_freq
+
+    @class_b_ping_slot_freq.setter
+    def class_b_ping_slot_freq(self, value):
+        if self.supports_class_b and value is None:
+            raise ValueError("DeviceProfile: class_b_ping_slot_freq is required when supports_class_b is True")
+        self._class_b_ping_slot_freq = value
 
     @property 
     def class_c_timeout(self):
-        if self.supports_class_c and self.class_c_timeout is None:
+        if self.supports_class_c and self._class_c_timeout is None:
             raise ValueError("DeviceProfile: class_c_timeout is required when supports_class_c is True")
-        return self.class_c_timeout
+        return self._class_c_timeout
+
+    @class_c_timeout.setter
+    def class_c_timeout(self, value):
+        if self.supports_class_c and value is None:
+            raise ValueError("DeviceProfile: class_c_timeout is required when supports_class_c is True")
+        self._class_c_timeout = value
 
     def __str__(self):
         """String representation of the Device Profile object"""

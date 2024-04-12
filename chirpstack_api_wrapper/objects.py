@@ -51,6 +51,18 @@ class AdrAlgorithm(Enum):
     LR_FHSS_ONLY = "lr_fhss"
     BOTH = "lora_lr_fhss"
 
+class ClassBPingSlot(Enum):
+    """Definition of Class-B ping-slot periodicity Object."""
+    NONE = None
+    EVERY_SEC = 0
+    EVERY_2SEC = 1
+    EVERY_4SEC = 2
+    EVERY_8SEC = 3
+    EVERY_16SEC = 4
+    EVERY_32SEC = 5
+    EVERY_64SEC = 6
+    EVERY_128SEC = 7
+
 class Gateway:
     """
     Definition of Gateway Object for Chirpstack.
@@ -151,7 +163,7 @@ class DeviceProfile:
     def __init__(self,name:str,tenant_id:str,region:Region,mac_version:MacVersion,reg_params_revision:RegParamsRevision,
         uplink_interval:int,supports_otaa:bool,supports_class_b:bool,supports_class_c:bool,abp_rx1_delay:int=None,
         abp_rx1_dr_offset:int=None,abp_rx2_dr:int=None,abp_rx2_freq:int=None,class_b_timeout:int=None,
-        class_b_ping_slot_nb_k:int=None,class_b_ping_slot_dr:int=None,class_b_ping_slot_freq:int=None,
+        class_b_ping_slot_nb_k:ClassBPingSlot=ClassBPingSlot.NONE,class_b_ping_slot_dr:int=None,class_b_ping_slot_freq:int=None,
         class_c_timeout:int=None,id:str="",description:str='',payload_codec_runtime:CodecRuntime=CodecRuntime.NONE,
         payload_codec_script:str="",flush_queue_on_activate:bool=True,device_status_req_interval:int=1,tags:dict={},
         auto_detect_measurements:bool=True,allow_roaming:bool=False,adr_algorithm_id:AdrAlgorithm=AdrAlgorithm.LORA_ONLY):
@@ -174,7 +186,7 @@ class DeviceProfile:
         self._abp_rx2_freq = abp_rx2_freq;self.abp_rx2_freq
         self.supports_class_b = supports_class_b
         self._class_b_timeout = class_b_timeout;self.class_b_timeout
-        self._class_b_ping_slot_nb_k = class_b_ping_slot_nb_k;self.class_b_ping_slot_nb_k
+        self._class_b_ping_slot_nb_k = class_b_ping_slot_nb_k.value;self.class_b_ping_slot_nb_k
         self._class_b_ping_slot_dr = class_b_ping_slot_dr;self.class_b_ping_slot_dr
         self._class_b_ping_slot_freq = class_b_ping_slot_freq;self.class_b_ping_slot_freq
         self.supports_class_c = supports_class_c
@@ -282,7 +294,7 @@ class DeviceProfile:
         return self._class_b_ping_slot_nb_k
 
     @class_b_ping_slot_nb_k.setter
-    def class_b_ping_slot_nb_k(self, value):
+    def class_b_ping_slot_nb_k(self, val):
         if self.supports_class_b and value is None:
             raise ValueError("DeviceProfile: class_b_ping_slot_nb_k is required when supports_class_b is True")
         self._class_b_ping_slot_nb_k = value

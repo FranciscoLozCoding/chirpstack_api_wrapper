@@ -395,9 +395,9 @@ class DeviceKeys:
     - dev_eui (EUI64): The unique identifier of the device associated with the keys.
         Passing in a Device object will also work.
     - nwk_key: Network root key (128 bit). For LoRaWAN 1.0.x, use this field for the LoRaWAN 1.0.x 'AppKey`.
-    - app_key: Application root key (128 bit). This field only needs to be set for LoRaWAN 1.1.x devices.
+    - app_key (optional): Application root key (128 bit). This field only needs to be set for LoRaWAN 1.1.x devices.
     """
-    def __init__(self,dev_eui:str,nwk_key:str="",app_key:str=""):
+    def __init__(self,dev_eui:str,nwk_key:str,app_key:str=""):
         """Constructor method to initialize a Device Key object."""
 
         self.dev_eui = str(dev_eui)

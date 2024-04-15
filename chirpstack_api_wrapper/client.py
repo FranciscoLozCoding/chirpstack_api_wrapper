@@ -97,27 +97,6 @@ class ChirpstackClient:
 
         return devices
 
-    def get_device(self, dev_eui: str) -> dict:
-        """
-        Get device.
-
-        Params:
-        - dev_eui: unique identifier of the device.
-        """
-        client = api.DeviceServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.GetDeviceRequest()
-        req.dev_eui = dev_eui
-
-        try:
-            return client.Get(req, metadata=metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.get_device, dev_eui)
-
     def list_all_apps(self,tenant_resp: dict) -> dict:
         """
         List all apps.
@@ -167,6 +146,27 @@ class ChirpstackClient:
             return self.List_agg_pagination(client,req,metadata)
         except grpc.RpcError as e:
             return self.refresh_token(e, self.list_tenants)
+
+    def get_device(self, dev_eui: str) -> dict:
+        """
+        Get device.
+
+        Params:
+        - dev_eui: unique identifier of the device.
+        """
+        client = api.DeviceServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.GetDeviceRequest()
+        req.dev_eui = dev_eui
+
+        try:
+            return client.Get(req, metadata=metadata)
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.get_device, dev_eui)
 
     def get_device_profile(self,device_profile_id: str) -> dict:
         """

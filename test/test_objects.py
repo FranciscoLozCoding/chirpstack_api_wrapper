@@ -16,5 +16,14 @@ class TestGateway(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             Gateway("mock_name", "mock_gateway_id", "mock_tenant_id",tags=mock_tags)
 
+    def test_str_method(self):
+        """
+        Test Gateway's conversion to string
+        """
+        mock_gateway = Gateway(name="mock", gateway_id="mock_gw_id", tenant_id="mock_tenant_id")
+
+        # Assertations
+        self.assertEqual(str(mock_gateway), "mock_gw_id")
+
 if __name__ == "__main__":
     unittest.main()

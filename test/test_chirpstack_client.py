@@ -814,7 +814,7 @@ class TestCreateApp(unittest.TestCase):
 
     @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
-    def test_create_gw_happy_path(self, mock_insecure_channel, mock_app_service_stub):
+    def test_create_app_happy_path(self, mock_insecure_channel, mock_app_service_stub):
         """
         Test create_app() method's happy path
         """
@@ -881,7 +881,7 @@ class TestCreateApp(unittest.TestCase):
     @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
-    def test_create_gw_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_app_service_stub):
+    def test_create_app_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_app_service_stub):
         """
         Test create_app() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
         """
@@ -894,7 +894,7 @@ class TestCreateApp(unittest.TestCase):
         mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
         mock_rpc_error.details = lambda: 'ExpiredSignature'
 
-        # Mock the GatewayServiceStub
+        # Mock the app service stub
         mock_app_service_stub_instance = mock_app_service_stub.return_value
         mock_app_service_stub_instance.Create.side_effect = mock_rpc_error
 
@@ -919,9 +919,134 @@ class TestCreateApp(unittest.TestCase):
         # assertations
         self.assertEqual(return_val, None)
 
-#TODO
-# class TestCreateDeviceProfile(unittest.TestCase):
-#     return
+class TestCreateDeviceProfile(unittest.TestCase):
+
+    @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_create_dp_happy_path(self, mock_insecure_channel, mock_dp_service_stub):
+        """
+        Test create_device_profile() method's happy path
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        #mock response
+        mock_resp = MagicMock()
+        mock_resp.id = "1234"
+
+        # Mock the ApplicationServiceStub
+        mock_dp_service_stub_instance = mock_dp_service_stub.return_value
+        mock_dp_service_stub_instance.Create.return_value = mock_resp
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        #Mock tags
+        mock_tags = {
+            "mock1": "test1",
+            "mock2": "test2"
+        }
+
+        #mock device profile
+        mock_dp = DeviceProfile(
+            name="mock_dp",
+            tenant_id="54f14cd5-d6a1-4fbd-8a81-1022d1d41234", 
+            region=Region.US915,
+            mac_version=MacVersion.LORAWAN_1_0_2,
+            reg_params_revision=RegParamsRevision.A,
+            uplink_interval=3600,
+            supports_otaa=True,
+            supports_class_b=False,
+            supports_class_c=False,
+            description="mock description",
+            payload_codec_runtime=CodecRuntime.JS,
+            payload_codec_script="mock js script",
+            flush_queue_on_activate=False,
+            device_status_req_interval=2,
+            tags=mock_tags,
+            auto_detect_measurements=False,
+            allow_roaming=True,
+            adr_algorithm_id=AdrAlgorithm.BOTH
+            )
+
+        # Call function in testing
+        return_val = client.create_device_profile(mock_dp)
+
+        # Assert the result and object
+        self.assertEqual(return_val, None)
+        self.assertEqual(mock_dp.id, "1234")
+
+    @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_create_dp_no_dp(self, mock_insecure_channel, mock_dp_service_stub):
+        """
+        Test create_device_profile() method's DeviceProfile TypeError
+        """
+
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the DeviceProfileServiceStub
+        mock_dp_service_stub_instance = mock_dp_service_stub.return_value
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock app
+        mock_dp = "mock" # NOT a DeviceProfile Instance
+
+        # Call function in testing and Assert Raise
+        with self.assertRaises(TypeError) as context:
+            client.create_device_profile(mock_dp)
+
+    @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_create_app_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_dp_service_stub):
+        """
+        Test create_device_profile() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_rpc_error.details = lambda: 'ExpiredSignature'
+
+        # Mock the dp service stub
+        mock_dp_service_stub_instance = mock_dp_service_stub.return_value
+        mock_dp_service_stub_instance.Create.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        #mock device profile
+        mock_dp = DeviceProfile(
+            name="mock_dp",
+            tenant_id="54f14cd5-d6a1-4fbd-8a81-1022d1d41234", 
+            region=Region.US915,
+            mac_version=MacVersion.LORAWAN_1_0_2,
+            reg_params_revision=RegParamsRevision.A,
+            uplink_interval=3600,
+            supports_otaa=True,
+            supports_class_b=False,
+            supports_class_c=False
+        )
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+
+            #mock refresh token successfully logging in and retrying the method in testing
+            with patch.object(client, "refresh_token", return_value=None):
+                # Call the method in testing
+                return_val = client.create_device_profile(mock_dp)
+
+        # assertations
+        self.assertEqual(return_val, None)
 
 #TODO
 # class TestCreateDevice(unittest.TestCase):

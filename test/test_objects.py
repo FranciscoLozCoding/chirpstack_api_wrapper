@@ -739,5 +739,39 @@ class TestDeviceProfile(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             str(mock_dp)
 
+class TestDevice(unittest.TestCase):
+    def test_tags_ValueError(self):
+        """
+        Test Device's tags ValueError in init 
+        """
+        mock_tags = {
+            "mock1": 1, # NOT a str
+            "mock2": "test2"
+        }
+        # Init Device and Assert Raise
+        with self.assertRaises(ValueError) as context:
+            Device("mock_name", "mock_deveui", "mock_app_id", "mock_dp_id", tags=mock_tags)
+
+    def test_vars_ValueError(self):
+        """
+        Test Device's variables ValueError in init 
+        """
+        mock_vars = {
+            "mock1": 1, # NOT a str
+            "mock2": "test2"
+        }
+        # Init Device and Assert Raise
+        with self.assertRaises(ValueError) as context:
+            Device("mock_name", "mock_deveui", "mock_app_id", "mock_dp_id", variables=mock_vars)
+
+    def test_str_method(self):
+        """
+        Test Device's conversion to string
+        """
+        mock_device = Device("mock_name", "mock_deveui", "mock_app_id", "mock_dp_id")
+
+        # Assertations
+        self.assertEqual(str(mock_device), "mock_deveui")
+
 if __name__ == "__main__":
     unittest.main()

@@ -294,7 +294,7 @@ class DeviceProfile:
         return self._class_b_ping_slot_nb_k
 
     @class_b_ping_slot_nb_k.setter
-    def class_b_ping_slot_nb_k(self, val):
+    def class_b_ping_slot_nb_k(self, value):
         if self.supports_class_b and value is None:
             raise ValueError("DeviceProfile: class_b_ping_slot_nb_k is required when supports_class_b is True")
         self._class_b_ping_slot_nb_k = value
@@ -384,3 +384,19 @@ class Device:
     def __str__(self):
         """String representation of the Device object"""
         return self.dev_eui
+
+class DeviceKeys:
+    """
+    Definition of Device Keys Object for Chirpstack.
+
+    Params:
+    - device: The device associated with the keys.
+    - nwk_key: Network root key (128 bit). For LoRaWAN 1.0.x, use this field for the LoRaWAN 1.0.x 'AppKey`.
+    - app_key: Application root key (128 bit). This field only needs to be set for LoRaWAN 1.1.x devices.
+    """
+    def __init__(self,device:Device,nwk_key:str="",app_key:str=""):
+        """Constructor method to initialize a Device Key object."""
+
+        self.dev_eui = str(device)
+        self.nwk_key = nwk_key
+        self.app_key = app_key

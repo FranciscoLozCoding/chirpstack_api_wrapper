@@ -420,6 +420,27 @@ class ChirpstackClient:
         except grpc.RpcError as e:
             return self.refresh_token(e, self.create_gateway, gateway)
 
+    def delete_device(self, dev_eui:str) -> None:
+        """
+        Delete a Device.
+
+        Params:
+        - dev_eui: The unique identifier of the device to delete.
+        """
+        client = api.DeviceServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.DeleteDeviceRequest()
+        req.dev_eui = dev_eui
+
+        try:
+            return client.Delete(req, metadata=metadata)
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.delete_device, dev_eui)
+
     @staticmethod
     def List_agg_pagination(client,req,metadata) -> dict:
         """

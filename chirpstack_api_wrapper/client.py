@@ -195,8 +195,8 @@ class ChirpstackClient:
 
         Params:
         - dev_eui: unique identifier of the device.
-        - lw_v: The lorawan version the device is using 
-            (input directly from ChirpstackClient.get_device_profile() output).
+        - lw_v: The lorawan version the device is using. 
+            input directly from ChirpstackClient.get_device_profile() output or use MacVersion Object.
         """
         client = api.DeviceServiceStub(self.channel)
 

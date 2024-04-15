@@ -254,6 +254,143 @@ class ChirpstackClient:
         except grpc.RpcError as e:
             return self.refresh_token(e, self.get_device_activation, deveui)
 
+    def create_app(self,app:Application) -> None:
+        """
+        Create an Application.
+
+        Params:
+        - app: The app record to create.
+        """
+        if not isinstance(app, Application):
+            raise TypeError("Expected Application object")
+
+        client = api.ApplicationServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.CreateApplicationRequest()
+        req.application.name = app.name
+        req.application.description = app.description
+        req.application.tenant_id = app.tenant_id
+        req.application.tags.update(app.tags)
+
+        try:
+            resp = client.Create(req, metadata=metadata)
+            app.id = resp.id #attach chirp generated uuid to app object
+            return 
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.create_app, app)
+
+    def create_device_profile(self,device_profile:DeviceProfile) -> None:
+        """
+        Create a Device Profile.
+
+        Params:
+        - device_profile: The device profile record to create.
+        """
+        if not isinstance(device_profile, DeviceProfile):
+            raise TypeError("Expected DeviceProfile object")
+
+        client = api.DeviceProfileServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.CreateDeviceProfileRequest()
+        req.device_profile.name = device_profile.name
+        req.device_profile.tenant_id = device_profile.tenant_id
+        req.device_profile.region = device_profile.region
+        req.device_profile.mac_version = device_profile.mac_version
+        req.device_profile.reg_params_revision = device_profile.reg_params_revision
+        req.device_profile.uplink_interval = device_profile.uplink_interval
+        req.device_profile.supports_otaa = device_profile.supports_otaa
+        req.device_profile.abp_rx1_delay = device_profile.abp_rx1_delay if device_profile.abp_rx1_delay is not None else 0
+        req.device_profile.abp_rx1_dr_offset = device_profile.abp_rx1_dr_offset if device_profile.abp_rx1_dr_offset is not None else 0
+        req.device_profile.abp_rx2_dr = device_profile.abp_rx2_dr if device_profile.abp_rx2_dr is not None else 0
+        req.device_profile.abp_rx2_freq = device_profile.abp_rx2_freq if device_profile.abp_rx2_freq is not None else 0
+        req.device_profile.supports_class_b = device_profile.supports_class_b
+        req.device_profile.class_b_timeout = device_profile.class_b_timeout if device_profile.class_b_timeout is not None else 0
+        req.device_profile.class_b_ping_slot_nb_k = device_profile.class_b_ping_slot_nb_k if device_profile.class_b_ping_slot_nb_k is not None else 0
+        req.device_profile.class_b_ping_slot_dr = device_profile.class_b_ping_slot_dr if device_profile.class_b_ping_slot_dr is not None else 0
+        req.device_profile.class_b_ping_slot_freq = device_profile.class_b_ping_slot_freq if device_profile.class_b_ping_slot_freq is not None else 0
+        req.device_profile.supports_class_c = device_profile.supports_class_c
+        req.device_profile.class_c_timeout = device_profile.class_c_timeout if device_profile.class_c_timeout is not None else 0
+        req.device_profile.description = device_profile.description
+        req.device_profile.payload_codec_runtime = device_profile.payload_codec_runtime
+        req.device_profile.payload_codec_script = device_profile.payload_codec_script
+        req.device_profile.flush_queue_on_activate = device_profile.flush_queue_on_activate
+        req.device_profile.device_status_req_interval = device_profile.device_status_req_interval
+        req.device_profile.auto_detect_measurements = device_profile.auto_detect_measurements
+        req.device_profile.allow_roaming = device_profile.allow_roaming
+        req.device_profile.adr_algorithm_id = device_profile.adr_algorithm_id
+        req.device_profile.tags.update(device_profile.tags)
+
+        try:
+            resp = client.Create(req, metadata=metadata)
+            device_profile.id = resp.id #attach chirp generated uuid to device profile object
+            return 
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.create_device_profile, device_profile)
+
+    def create_device(self,device:Device) -> None:
+        """
+        Create a Device.
+
+        Params:
+        - device: The device record to create.
+        """
+        if not isinstance(device, Device):
+            raise TypeError("Expected Device object")
+
+        client = api.DeviceServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.CreateDeviceRequest()
+        req.device.name = device.name
+        req.device.dev_eui = device.dev_eui
+        req.device.application_id = device.application_id
+        req.device.device_profile_id = device.device_profile_id
+        req.device.join_eui = device.join_eui
+        req.device.description = device.description
+        req.device.skip_fcnt_check = device.skip_fcnt_check
+        req.device.is_disabled = device.is_disabled
+        req.device.tags.update(device.tags)
+        req.device.variables.update(device.variables)
+
+        try:
+            return client.Create(req, metadata=metadata)
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.create_device, device)
+
+    def create_device_keys(self,device_keys:DeviceKeys) -> None:
+        """
+        Create device keys.
+
+        Params:
+        - device_keys: The device keys record to create.
+        """
+        client = api.DeviceServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.CreateDeviceKeysRequest()
+        req.device_keys.dev_eui = device_keys.dev_eui
+        req.device_keys.nwk_key = device_keys.nwk_key
+        req.device_keys.app_key = device_keys.app_key
+
+        try:
+            return client.CreateKeys(req, metadata=metadata)
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.create_device_keys, device_keys)
+
     def create_gateway(self,gateway:Gateway) -> None:
         """
         Create a Gateway.

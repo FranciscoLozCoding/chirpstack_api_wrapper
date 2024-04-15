@@ -347,7 +347,7 @@ class Device:
 
     Params:
     - name: Name of the device.
-    - dev_eui (EUI64): unique identifier of the device (EUI64).
+    - dev_eui (EUI64): unique identifier of the device.
     - application_id: unique identifier of the application associated to the device.
         Passing in an Application object will also work.
     - device_profile_id: unique identifier of the device profile associated to the device.
@@ -392,13 +392,14 @@ class DeviceKeys:
     Definition of Device Keys Object for Chirpstack.
 
     Params:
-    - device: The device associated with the keys.
+    - dev_eui (EUI64): The unique identifier of the device associated with the keys.
+        Passing in a Device object will also work.
     - nwk_key: Network root key (128 bit). For LoRaWAN 1.0.x, use this field for the LoRaWAN 1.0.x 'AppKey`.
     - app_key: Application root key (128 bit). This field only needs to be set for LoRaWAN 1.1.x devices.
     """
-    def __init__(self,device:Device,nwk_key:str="",app_key:str=""):
+    def __init__(self,dev_eui:str,nwk_key:str="",app_key:str=""):
         """Constructor method to initialize a Device Key object."""
 
-        self.dev_eui = str(device)
+        self.dev_eui = str(dev_eui)
         self.nwk_key = nwk_key
         self.app_key = app_key

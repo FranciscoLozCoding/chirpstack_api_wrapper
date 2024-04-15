@@ -349,7 +349,9 @@ class Device:
     - name: Name of the device.
     - dev_eui (EUI64): unique identifier of the device (EUI64).
     - application_id: unique identifier of the application associated to the device.
+        Passing in an Application object will also work.
     - device_profile_id: unique identifier of the device profile associated to the device.
+        Passing in a DeviceProfile object will also work.
     - join_eui (EUI64, optional): unique identifier of the join server.
         This field will be automatically set on OTAA.
     - description (optional): Description of the device.
@@ -362,7 +364,7 @@ class Device:
         These variables are not exposed in the event payloads. 
         They can be used together with integrations to store secrets that must be configured per device.
     """
-    def __init__(self,name:str,dev_eui:str,application_id:Application,device_profile_id:DeviceProfile,
+    def __init__(self,name:str,dev_eui:str,application_id:str,device_profile_id:str,
         join_eui:str="",description:str='',skip_fcnt_check:bool=False,is_disabled:bool=False,tags:dict={},variables:dict={}):
         """Constructor method to initialize a Device object."""
         if not all(isinstance(value, str) for value in tags.values()):

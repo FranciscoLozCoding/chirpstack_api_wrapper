@@ -1183,7 +1183,7 @@ class TestCreateDeviceKeys(unittest.TestCase):
         # Mock device keys
         mock_dk = DeviceKeys(dev_eui="a30012969b74de70", nwk_key="0f09f1223715f93d8aa3a7101fad0f04")
 
-        # Call create_gateway
+        # Call method in testing
         return_val = client.create_device_keys(mock_dk)
 
         # Assert the result
@@ -1192,7 +1192,7 @@ class TestCreateDeviceKeys(unittest.TestCase):
     @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
-    def test_create_gw_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
+    def test_create_dk_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
         """
         Test create_device() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
         """
@@ -1322,9 +1322,65 @@ class TestCreateGateway(unittest.TestCase):
         # assertations
         self.assertEqual(return_val, None)
 
-#TODO
-# class TestDeleteDevice(unittest.TestCase):
-#     return
+class TestDeleteDevice(unittest.TestCase):
+
+    @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_delete_device_happy_path(self, mock_insecure_channel, mock_device_service_stub):
+        """
+        Test delete_device() method's happy path
+        """
+
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the GatewayServiceStub
+        mock_device_service_stub_instance = mock_device_service_stub.return_value
+        mock_device_service_stub_instance.Delete.return_value = None
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Call method in testing
+        return_val = client.delete_device("mock deveui")
+
+        # Assert the result
+        self.assertEqual(return_val, None)
+
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_delete_device_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
+        """
+        Test delete_device() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_rpc_error.details = lambda: 'ExpiredSignature'
+
+        # Mock the DeviceServiceStub
+        mock_device_service_stub_instance = mock_device_service_stub.return_value
+        mock_device_service_stub_instance.Delete.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+
+            #mock refresh token successfully logging in and retrying the method in testing
+            with patch.object(client, "refresh_token", return_value=None):
+                # Call the method in testing
+                return_val = client.delete_device("mock deveui")
+
+        # assertations
+        self.assertEqual(return_val, None)
 
 class TestRefreshToken(unittest.TestCase):
 

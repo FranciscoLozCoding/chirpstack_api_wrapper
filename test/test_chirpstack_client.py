@@ -810,6 +810,127 @@ class TestListAggPagination(unittest.TestCase):
         # Assert the result
         self.assertEqual(aggregated_records, ["result_page1", "result_page2"])
 
+class TestCreateApp(unittest.TestCase):
+
+    @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_create_gw_happy_path(self, mock_insecure_channel, mock_app_service_stub):
+        """
+        Test create_app() method's happy path
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        #mock response
+        mock_resp = MagicMock()
+        mock_resp.id = "1234"
+
+        # Mock the ApplicationServiceStub
+        mock_app_service_stub_instance = mock_app_service_stub.return_value
+        mock_app_service_stub_instance.Create.return_value = mock_resp
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        #Mock tags
+        mock_tags = {
+            "mock1": "test1",
+            "mock2": "test2"
+        }
+
+        #mock app
+        mock_app = Application(
+            name="mock", 
+            tenant_id="54f14cd5-d6a1-4fbd-8a81-1022d1d41234",
+            description="mock description",
+            tags=mock_tags
+            )
+
+        # Call create_app
+        return_val = client.create_app(mock_app)
+
+        # Assert the result and object
+        self.assertEqual(return_val, None)
+        self.assertEqual(mock_app.id, "1234")
+
+    @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_create_app_no_app(self, mock_insecure_channel, mock_app_service_stub):
+        """
+        Test create_app() method's Application TypeError
+        """
+
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the ApplicationServiceStub
+        mock_app_service_stub_instance = mock_app_service_stub.return_value
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock app
+        mock_app = "mock" # NOT a Application Instance
+
+        # Call create_gateway and Assert Raise
+        with self.assertRaises(TypeError) as context:
+            client.create_app(mock_app)
+
+    @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_create_gw_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_app_service_stub):
+        """
+        Test create_app() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the create_app method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_rpc_error.details = lambda: 'ExpiredSignature'
+
+        # Mock the GatewayServiceStub
+        mock_app_service_stub_instance = mock_app_service_stub.return_value
+        mock_app_service_stub_instance.Create.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        #mock app
+        mock_app = Application(
+            name="mock", 
+            tenant_id="54f14cd5-d6a1-4fbd-8a81-1022d1d41234",
+            description="mock description"
+            )
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+
+            #mock refresh token successfully logging in and retrying the method in testing
+            with patch.object(client, "refresh_token", return_value=None):
+                # Call the method in testing
+                return_val = client.create_app(mock_app)
+
+        # assertations
+        self.assertEqual(return_val, None)
+
+#TODO
+# class TestCreateDeviceProfile(unittest.TestCase):
+#     return
+
+#TODO
+# class TestCreateDevice(unittest.TestCase):
+#     return
+
+#TODO
+# class TestCreateDeviceKeys(unittest.TestCase):
+#     return
+
 class TestCreateGateway(unittest.TestCase):
     
     @patch('chirpstack_api_wrapper.api.GatewayServiceStub')
@@ -905,6 +1026,10 @@ class TestCreateGateway(unittest.TestCase):
 
         # assertations
         self.assertEqual(return_val, None)
+
+#TODO
+# class TestDeleteDevice(unittest.TestCase):
+#     return
 
 class TestRefreshToken(unittest.TestCase):
 

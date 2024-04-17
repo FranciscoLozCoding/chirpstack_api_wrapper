@@ -166,7 +166,20 @@ class ChirpstackClient:
         try:
             return client.Get(req, metadata=metadata)
         except grpc.RpcError as e:
-            return self.refresh_token(e, self.get_device, dev_eui)
+
+            status_code = e.code()
+            details = e.details()
+
+            if status_code == grpc.StatusCode.NOT_FOUND:
+                logging.error("ChirpstackClient.get_device(): The device does not exist")
+                logging.error(f"    Details: {details}")
+            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
+                return self.refresh_token(e, self.get_device, dev_eui)
+            else:
+                logging.error(f"ChirpstackClient.get_device(): An error occurred with status code {status_code}")
+                logging.error(f"    Details: {details}")
+            
+            return {}
 
     def get_device_profile(self,device_profile_id: str) -> dict:
         """
@@ -187,7 +200,20 @@ class ChirpstackClient:
         try:
             return client.Get(req, metadata=metadata)
         except grpc.RpcError as e:
-            return self.refresh_token(e, self.get_device_profile, device_profile_id)
+
+            status_code = e.code()
+            details = e.details()
+
+            if status_code == grpc.StatusCode.NOT_FOUND:
+                logging.error("ChirpstackClient.get_device_profile(): The device profile does not exist")
+                logging.error(f"    Details: {details}")
+            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
+                return self.refresh_token(e, self.get_device_profile, device_profile_id)
+            else:
+                logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code}")
+                logging.error(f"    Details: {details}")
+            
+            return {}
     
     def get_device_app_key(self,deveui: str,lw_v: int) -> str:
         """
@@ -252,7 +278,20 @@ class ChirpstackClient:
         try:
             return client.GetActivation(req, metadata=metadata)
         except grpc.RpcError as e:
-            return self.refresh_token(e, self.get_device_activation, deveui)
+
+            status_code = e.code()
+            details = e.details()
+
+            if status_code == grpc.StatusCode.NOT_FOUND:
+                logging.error("ChirpstackClient.get_device_activation(): The device activation does not exist")
+                logging.error(f"    Details: {details}")
+            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
+                return self.refresh_token(e, self.get_device_activation, deveui)
+            else:
+                logging.error(f"ChirpstackClient.get_device_activation(): An error occurred with status code {status_code}")
+                logging.error(f"    Details: {details}")
+            
+            return {}
 
     def get_gateway(self,gateway_id:str) -> dict:
         """

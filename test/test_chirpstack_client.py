@@ -954,6 +954,134 @@ class TestGetDeviceActivation(unittest.TestCase):
 
         self.assertEqual(result, {})
 
+
+
+
+
+class TestGetGateway(unittest.TestCase):
+
+    @patch('chirpstack_api_wrapper.api.GatewayServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_gateway_happy_path(self, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test get_gateway() method's happy path
+        """
+
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+        mock_gw_service_stub_instance.Get.return_value = Mock(gw_info="mock_gw_info")
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the gateway id
+        mock_gw_id = "mock_gw_id"
+
+        # Call method in teseting
+        gw_info = client.get_gateway(mock_gw_id)
+
+        # Assert the result
+        self.assertEqual(gw_info.gw_info, "mock_gw_info")
+
+    @patch('chirpstack_api_wrapper.api.GatewayServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_get_gateway_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test get_gateway() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_rpc_error.details = lambda: 'ExpiredSignature'
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+        mock_gw_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the gateway id
+        mock_gw_id = "mock_gw_id"
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+
+            #mock refresh token successfully logging in and retrying the method in testing
+            with patch.object(client, "refresh_token", return_value="mock_gw_info"):
+                # Call the method in testing
+                result = client.get_gateway(mock_gw_id)
+
+        # assertations
+        self.assertEqual(result, "mock_gw_info")
+
+    @patch('chirpstack_api_wrapper.api.GatewayServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_gateway_not_found_grpc_error(self, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test get_gateway() when grpc error is raised for NOT_FOUND
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.NOT_FOUND
+        mock_rpc_error.details = lambda: 'Object does not exist'
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+        mock_gw_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the gateway id
+        mock_gw_id = "mock_gw_id"
+
+        result = client.get_gateway(mock_gw_id)
+
+        self.assertEqual(result, {})
+
+    @patch("chirpstack_api_wrapper.api.GatewayServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_gateway_other_grpc_error(self, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test get_gateway() when grpc error is not NOT_FOUND or UNAUTHENTICATED
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.INTERNAL
+        mock_rpc_error.details = lambda: 'other'
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+        mock_gw_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the gateway id
+        mock_gw_id = "mock_gw_id"
+
+        result = client.get_gateway(mock_gw_id)
+
+        self.assertEqual(result, {})
+
 class TestListAggPagination(unittest.TestCase):
 
     @patch('chirpstack_api_wrapper.api.DeviceServiceStub')

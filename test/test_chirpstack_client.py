@@ -135,6 +135,38 @@ class TestLogin(unittest.TestCase):
         # Assert that the system exit code is 1 (indicating failure)
         self.assertEqual(cm.exception.code, 1)
 
+class TestPing(unittest.TestCase):
+
+    def test_ping_success(self):
+        """
+        Test a successful ping
+        """
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE, False)
+
+        with patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            assert client.ping() == True
+
+    def test_ping_status_code_failure(self):
+        """
+        Test a failed ping because of an error code
+        """
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE, False)
+
+        with patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 404
+            assert client.ping() == False
+
+    def test_ping_exception_failure(self):
+        """
+        Test a failed ping because of an exception
+        """
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE, False)
+
+        with patch("requests.get") as mock_get:
+            mock_get.side_effect = Exception("Simulated network error")
+            assert client.ping() == False
+
 class TestListAllDevices(unittest.TestCase):
 
     @patch('chirpstack_api_wrapper.api.InternalServiceStub')

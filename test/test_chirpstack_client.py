@@ -896,6 +896,64 @@ class TestGetDeviceActivation(unittest.TestCase):
         # assertations
         self.assertEqual(result, "mock_activation_details")
 
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_device_activation_not_found_grpc_error(self, mock_insecure_channel, mock_device_service_stub):
+        """
+        Test get_device_activation() when grpc error is raised for NOT_FOUND
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.NOT_FOUND
+        mock_rpc_error.details = lambda: 'Object does not exist'
+
+        # Mock the DeviceServiceStub
+        mock_device_service_stub_instance = mock_device_service_stub.return_value
+        mock_device_service_stub_instance.GetActivation.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the dev_eui
+        mock_dev_eui = "mock_dev_eui"
+
+        result = client.get_device_activation(mock_dev_eui)
+
+        self.assertEqual(result, {})
+
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_device_activation_other_grpc_error(self, mock_insecure_channel, mock_device_service_stub):
+        """
+        Test get_device_activation() when grpc error is not NOT_FOUND or UNAUTHENTICATED
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.INTERNAL
+        mock_rpc_error.details = lambda: 'other'
+
+        # Mock the DeviceServiceStub
+        mock_device_service_stub_instance = mock_device_service_stub.return_value
+        mock_device_service_stub_instance.GetActivation.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the dev_eui
+        mock_dev_eui = "mock_dev_eui"
+
+        result = client.get_device_activation(mock_dev_eui)
+
+        self.assertEqual(result, {})
+
 class TestListAggPagination(unittest.TestCase):
 
     @patch('chirpstack_api_wrapper.api.DeviceServiceStub')

@@ -153,6 +153,7 @@ class ChirpstackClient:
 
         Params:
         - dev_eui: unique identifier of the device.
+            Passing in a Device object will also work.
         """
         client = api.DeviceServiceStub(self.channel)
 
@@ -161,7 +162,7 @@ class ChirpstackClient:
 
         #Construct request
         req = api.GetDeviceRequest()
-        req.dev_eui = dev_eui
+        req.dev_eui = str(dev_eui)
 
         try:
             return client.Get(req, metadata=metadata)
@@ -187,6 +188,7 @@ class ChirpstackClient:
 
         Params:
         - device_profile_id: unique identifier of the device profile.
+            Passing in a Device Profile object will also work.
         """
         client = api.DeviceProfileServiceStub(self.channel)
 
@@ -195,7 +197,7 @@ class ChirpstackClient:
 
         #Construct request
         req = api.GetDeviceProfileRequest()
-        req.id = device_profile_id
+        req.id = str(device_profile_id)
 
         try:
             return client.Get(req, metadata=metadata)
@@ -221,6 +223,7 @@ class ChirpstackClient:
 
         Params:
         - dev_eui: unique identifier of the device.
+            Passing in a Device object will also work.
         - lw_v: The lorawan version the device is using. 
             input directly from ChirpstackClient.get_device_profile() output or use MacVersion Object.
         """
@@ -231,7 +234,7 @@ class ChirpstackClient:
 
         #construct request
         req = api.GetDeviceKeysRequest()
-        req.dev_eui = deveui
+        req.dev_eui = str(deveui)
 
         try:
             resp = client.GetKeys(req, metadata=metadata)
@@ -265,6 +268,7 @@ class ChirpstackClient:
 
         Params:
         - dev_eui: unique identifier of the device.
+            Passing in a Device object will also work.
         """
         client = api.DeviceServiceStub(self.channel)
 
@@ -273,7 +277,7 @@ class ChirpstackClient:
 
         #construct request
         req = api.GetDeviceActivationRequest()
-        req.dev_eui = deveui
+        req.dev_eui = str(deveui)
 
         try:
             return client.GetActivation(req, metadata=metadata)
@@ -500,6 +504,7 @@ class ChirpstackClient:
 
         Params:
         - dev_eui: The unique identifier of the device to delete.
+            Passing in a Device object will also work.
         """
         client = api.DeviceServiceStub(self.channel)
 
@@ -508,7 +513,7 @@ class ChirpstackClient:
 
         #Construct request
         req = api.DeleteDeviceRequest()
-        req.dev_eui = dev_eui
+        req.dev_eui = str(dev_eui)
 
         try:
             return client.Delete(req, metadata=metadata)

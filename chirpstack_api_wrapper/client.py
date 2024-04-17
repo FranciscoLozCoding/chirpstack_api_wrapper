@@ -4,6 +4,7 @@ import logging
 import sys
 import os
 import time
+import requests
 from grpc import _channel as channel
 from chirpstack_api import api
 from chirpstack_api_wrapper.objects import *
@@ -20,14 +21,19 @@ class ChirpstackClient:
     - email: The email of the Account that will be used to call the Api(s).
     - password: The password of the Account that will be used to call the Api(s).
     - api_endpoint: The Chirpstack grpc api endpoint (usually port 8080).
+    - login_on_init (optional): The instance will try to login when initialized.
     """
-    def __init__(self, email:str, password:str, api_endpoint:str):
+    def __init__(self, email:str, password:str, api_endpoint:str, login_on_init: bool = True):
         """Constructor method to initialize a ChirpstackClient object."""   
         self.server = api_endpoint
         self.channel = grpc.insecure_channel(self.server)
         self.email = email
         self.password = password
-        self.auth_token = self.login()
+        self.login_on_init = login_on_init
+        if self.login_on_init:
+            self.auth_token = self.login()
+        else:
+            self.auth_token = None 
 
     def login(self) -> str:
         """
@@ -68,6 +74,20 @@ class ChirpstackClient:
         logging.info("ChirpstackClient.login(): Connected to Chirpstack Server")
 
         return resp.jwt
+
+    def ping(self) -> bool:
+        """
+        Checks if the server is reachable by sending a request. Returns True if reachable, False otherwise.
+        """
+        try:
+            response = requests.get(f"http://{self.server}")
+            if response.status_code >= 200 and response.status_code < 300:
+                return True
+            else:
+                return False
+        except Exception as e:
+            logging.error(f"ChirpstackClient.ping(): {e}")
+            return False
 
     def list_all_devices(self,app_resp: dict) -> dict:
         """
@@ -556,6 +576,10 @@ class ChirpstackClient:
             # Retry login and then re-run the specified method
             logging.warning(f"ChirpstackClient.{method.__name__}():JWT token expired. Retrying login...")
             self.auth_token = self.login()  # Update auth_token with the new token
+            time.sleep(2)  # Introduce a short delay before retrying
+            return method(*args, **kwargs)  # Re-run the specified method with the same parameters
+        elif not self.login_on_init:
+            self.auth_token = self.login() #login, since client didn't on init
             time.sleep(2)  # Introduce a short delay before retrying
             return method(*args, **kwargs)  # Re-run the specified method with the same parameters
 

@@ -1724,6 +1724,41 @@ class TestRefreshToken(unittest.TestCase):
     @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
     @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_refresh_token_get_device_no_login_on_init(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
+        """
+        Test refresh token's happy path when used by ChirpstackClient.get_device() and the client did not try to log in on init
+        - refresh_token() should call get_device() after token is refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the DeviceServiceStub
+        mock_device_service_stub_instance = mock_device_service_stub.return_value
+        mock_device_service_stub_instance.Get.return_value = Mock(device_info="mock_device_info")
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE,False)
+
+        # Mock the dev_eui
+        mock_dev_eui = "mock_dev_eui"
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+            # Create a dummy gRPC error
+            dummy_error = Mock()
+            dummy_error.code.return_value = grpc.StatusCode.UNAUTHENTICATED
+            dummy_error.details.return_value = "InvalidToken"
+
+            # Call the refresh_token method
+            result = client.refresh_token(dummy_error, client.get_device, mock_dev_eui)
+
+        # assertations
+        self.assertEqual(result, client.get_device(mock_dev_eui))
+
+    @patch("chirpstack_api_wrapper.api.DeviceServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
     def test_refresh_token_get_device_not_expired(self, mock_sleep, mock_insecure_channel, mock_device_service_stub):
         """
         Test refresh token's raised exception when used by ChirpstackClient.get_device()

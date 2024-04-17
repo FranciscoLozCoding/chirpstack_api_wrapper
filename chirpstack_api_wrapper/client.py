@@ -254,6 +254,41 @@ class ChirpstackClient:
         except grpc.RpcError as e:
             return self.refresh_token(e, self.get_device_activation, deveui)
 
+    def get_gateway(self,gateway_id:str) -> dict:
+        """
+        Get gateway.
+
+        Params:
+        - gateway_id (EUI64): Unique identifier for the gateway.
+            Passing in a Gateway object will also work.
+        """
+        client = api.GatewayServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.GetGatewayRequest()
+        req.gateway_id = str(gateway_id)
+
+        try:
+            return client.Get(req, metadata=metadata)
+        except grpc.RpcError as e:
+
+            status_code = e.code()
+            details = e.details()
+
+            if status_code == grpc.StatusCode.NOT_FOUND:
+                logging.error("ChirpstackClient.get_gateway(): The gateway does not exist")
+                logging.error(f"    Details: {details}")
+            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
+                return self.refresh_token(e, self.get_gateway, gateway_id)
+            else:
+                logging.error(f"ChirpstackClient.get_gateway(): An error occurred with status code {status_code}")
+                logging.error(f"    Details: {details}")
+            
+            return {}
+
     def create_app(self,app:Application) -> None:
         """
         Create an Application.

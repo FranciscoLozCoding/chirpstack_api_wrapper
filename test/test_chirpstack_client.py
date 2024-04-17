@@ -497,6 +497,64 @@ class TestGetDeviceProfile(unittest.TestCase):
         # assertations
         self.assertEqual(device_profile_info, "mock_device_profile_info")
 
+    @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_device_profile_not_found_grpc_error(self, mock_insecure_channel, mock_device_profile_service_stub):
+        """
+        Test get_device_profile() when grpc error is raised for NOT_FOUND
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.NOT_FOUND
+        mock_rpc_error.details = lambda: 'Object does not exist'
+
+        # Mock the DeviceProfileServiceStub
+        mock_device_profile_service_stub_instance = mock_device_profile_service_stub.return_value
+        mock_device_profile_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the device profile ID
+        mock_device_profile_id = "mock_device_profile_id"
+
+        result = client.get_device_profile(mock_device_profile_id)
+
+        self.assertEqual(result, {})
+
+    @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_device_other_grpc_error(self, mock_insecure_channel, mock_device_profile_service_stub):
+        """
+        Test get_device_profile() when grpc error is not NOT_FOUND or UNAUTHENTICATED
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.INTERNAL
+        mock_rpc_error.details = lambda: 'other'
+
+        # Mock the DeviceProfileServiceStub
+        mock_device_profile_service_stub_instance = mock_device_profile_service_stub.return_value
+        mock_device_profile_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the device profile ID
+        mock_device_profile_id = "mock_device_profile_id"
+
+        result = client.get_device_profile(mock_device_profile_id)
+
+        self.assertEqual(result, {})
+
 class TestGetDeviceAppKey(unittest.TestCase):
 
     @patch('chirpstack_api_wrapper.api.DeviceServiceStub')

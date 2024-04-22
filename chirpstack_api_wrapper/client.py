@@ -518,6 +518,28 @@ class ChirpstackClient:
         except grpc.RpcError as e:
             return self.refresh_token(e, self.create_gateway, gateway)
 
+    def delete_app(self, app_id:str) -> None:
+        """
+        Delete an Application.
+
+        Params:
+        - app_id: unique identifier of the application.
+            Passing in an Application object will also work.
+        """
+        client = api.ApplicationServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.DeleteApplicationRequest()
+        req.id = str(app_id)
+
+        try:
+            return client.Delete(req, metadata=metadata)
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.delete_app, app_id)
+
     def delete_device(self, dev_eui:str) -> None:
         """
         Delete a Device.

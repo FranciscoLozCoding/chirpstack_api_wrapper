@@ -540,6 +540,28 @@ class ChirpstackClient:
         except grpc.RpcError as e:
             return self.refresh_token(e, self.delete_device, dev_eui)
 
+    def delete_device_profile(self, device_profile_id:str) -> None:
+        """
+        Delete a Device Profile.
+
+        Params:
+        - device_profile_id: unique identifier of the device profile.
+            Passing in a Device Profile object will also work.
+        """
+        client = api.DeviceProfileServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.DeleteDeviceProfileRequest()
+        req.id = str(device_profile_id)
+
+        try:
+            return client.Delete(req, metadata=metadata)
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.delete_device_profile, device_profile_id)
+
     @staticmethod
     def List_agg_pagination(client,req,metadata) -> dict:
         """

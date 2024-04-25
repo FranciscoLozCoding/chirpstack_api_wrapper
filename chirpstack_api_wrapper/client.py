@@ -167,6 +167,41 @@ class ChirpstackClient:
         except grpc.RpcError as e:
             return self.refresh_token(e, self.list_tenants)
 
+    def get_app(self,app_id: str) -> dict:
+        """
+        Get application.
+
+        Params:
+        - app_id: unique identifier of the app.
+            Passing in an Application object will also work.
+        """
+        client = api.ApplicationServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.GetApplicationRequest()
+        req.id = str(app_id)
+
+        try:
+            return client.Get(req, metadata=metadata)
+        except grpc.RpcError as e:
+
+            status_code = e.code()
+            details = e.details()
+
+            if status_code == grpc.StatusCode.NOT_FOUND:
+                logging.error("ChirpstackClient.get_app(): The application does not exist")
+                logging.error(f"    Details: {details}")
+            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
+                return self.refresh_token(e, self.get_app, app_id)
+            else:
+                logging.error(f"ChirpstackClient.get_app(): An error occurred with status code {status_code}")
+                logging.error(f"    Details: {details}")
+            
+            return {}
+
     def get_device(self, dev_eui: str) -> dict:
         """
         Get device.

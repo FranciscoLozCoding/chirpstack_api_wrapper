@@ -619,6 +619,28 @@ class ChirpstackClient:
         except grpc.RpcError as e:
             return self.refresh_token(e, self.delete_device_profile, device_profile_id)
 
+    def delete_gateway(self, gateway_id:str) -> None:
+        """
+        Delete a Gateway.
+
+        Params:
+        - gateway_id (EUI64): Unique identifier for the gateway.
+            Passing in a Gateway object will also work.
+        """
+        client = api.GatewayServiceStub(self.channel)
+
+        # Define the JWT key metadata.
+        metadata = [("authorization", "Bearer %s" % self.auth_token)]
+
+        #Construct request
+        req = api.DeleteGatewayRequest()
+        req.gateway_id = str(gateway_id)
+
+        try:
+            return client.Delete(req, metadata=metadata)
+        except grpc.RpcError as e:
+            return self.refresh_token(e, self.delete_gateway, gateway_id)
+
     @staticmethod
     def List_agg_pagination(client,req,metadata) -> dict:
         """

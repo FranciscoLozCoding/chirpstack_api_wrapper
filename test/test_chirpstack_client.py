@@ -1961,6 +1961,67 @@ class TestDeleteProfile(unittest.TestCase):
         # assertations
         self.assertEqual(return_val, None)
 
+class TestDeleteGateway(unittest.TestCase):
+
+    @patch('chirpstack_api_wrapper.api.GatewayServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_delete_gateway_happy_path(self, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test delete_gateway() method's happy path
+        """
+
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+        mock_gw_service_stub_instance.Delete.return_value = None
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Call method in testing
+        return_val = client.delete_gateway("mock id")
+
+        # Assert the result
+        self.assertEqual(return_val, None)
+
+
+    @patch("chirpstack_api_wrapper.api.GatewayServiceStub")
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_delete_gateway_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_gw_service_stub):
+        """
+        Test delete_gateway() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_rpc_error.details = lambda: 'ExpiredSignature'
+
+        # Mock the GatewayServiceStub
+        mock_gw_service_stub_instance = mock_gw_service_stub.return_value
+        mock_gw_service_stub_instance.Delete.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+
+            #mock refresh token successfully logging in and retrying the method in testing
+            with patch.object(client, "refresh_token", return_value=None):
+                # Call the method in testing
+                return_val = client.delete_gateway("mock id")
+
+        # assertations
+        self.assertEqual(return_val, None)
+
 class TestRefreshToken(unittest.TestCase):
 
     @patch("chirpstack_api_wrapper.api.DeviceServiceStub")

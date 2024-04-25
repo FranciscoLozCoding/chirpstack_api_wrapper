@@ -340,6 +340,129 @@ class TestListTenants(unittest.TestCase):
         # Assert the result
         self.assertEqual(tenants, ["Tenant1", "Tenant1"])
 
+class TestGetApp(unittest.TestCase):
+
+    @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_app_happy_path(self, mock_insecure_channel, mock_app_stub):
+        """
+        Test get_app() method's happy path
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the ApplicationServiceStub
+        mock_app_stub_instance = mock_app_stub.return_value
+        mock_app_stub_instance.Get.return_value = Mock(app_info="mock_app_info")
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the app ID
+        mock_app_id = "mock_app_id"
+
+        # Call get_app
+        app_info = client.get_app(mock_app_id)
+
+        # Assert the result
+        self.assertEqual(app_info.app_info, "mock_app_info")
+
+    @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    @patch("chirpstack_api_wrapper.time.sleep", return_value=None) #dont time.sleep() for test case
+    def test_get_app_unauthenticated_grpc_error(self, mock_sleep, mock_insecure_channel, mock_app_service_stub):
+        """
+        Test get_app() when grpc error is raised for UNAUTHENTICATED and token needs to be refreshed
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_rpc_error.details = lambda: 'ExpiredSignature'
+
+        # Mock the ApplicationServiceStub
+        mock_app_service_stub_instance = mock_app_service_stub.return_value
+        mock_app_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the app ID
+        mock_app_id = "mock_app_id"
+
+        # Mock the login method to return a dummy token
+        with patch.object(client, "login", return_value="dummy_token"):
+
+            #mock refresh token successfully logging in and retrying the method in testing
+            with patch.object(client, "refresh_token", return_value="mock_app_info"):
+                # Call the method in testing
+                app_info = client.get_app(mock_app_id)
+
+        # assertations
+        self.assertEqual(app_info, "mock_app_info")
+
+    @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_app_not_found_grpc_error(self, mock_insecure_channel, mock_app_service_stub):
+        """
+        Test get_app() when grpc error is raised for NOT_FOUND
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.NOT_FOUND
+        mock_rpc_error.details = lambda: 'Object does not exist'
+
+        # Mock the ApplicationServiceStub
+        mock_app_service_stub_instance = mock_app_service_stub.return_value
+        mock_app_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the app ID
+        mock_app_id = "mock_app_id"
+
+        result = client.get_app(mock_app_id)
+
+        self.assertEqual(result, {})
+
+    @patch('chirpstack_api_wrapper.api.ApplicationServiceStub')
+    @patch('chirpstack_api_wrapper.grpc.insecure_channel')
+    def test_get_app_other_grpc_error(self, mock_insecure_channel, mock_app_service_stub):
+        """
+        Test get_app() when grpc error is not NOT_FOUND or UNAUTHENTICATED
+        """
+        # Mock the gRPC channel and login response
+        mock_channel = Mock()
+        mock_insecure_channel.return_value = mock_channel
+
+        # Mock the get_device method to raise grpc.RpcError()
+        mock_rpc_error = grpc.RpcError()
+        mock_rpc_error.code = lambda: grpc.StatusCode.INTERNAL
+        mock_rpc_error.details = lambda: 'other'
+
+        # Mock the ApplicationServiceStub
+        mock_app_service_stub_instance = mock_app_service_stub.return_value
+        mock_app_service_stub_instance.Get.side_effect = mock_rpc_error
+
+        # Create a ChirpstackClient instance
+        client = ChirpstackClient(CHIRPSTACK_ACT_EMAIL, CHIRPSTACK_ACT_PASSWORD, CHIRPSTACK_API_INTERFACE)
+
+        # Mock the app ID
+        mock_app_id = "mock_app_id"
+
+        result = client.get_app(mock_app_id)
+
+        self.assertEqual(result, {})
+
 class TestGetDevice(unittest.TestCase):
 
     @patch('chirpstack_api_wrapper.api.DeviceServiceStub')
@@ -560,7 +683,7 @@ class TestGetDeviceProfile(unittest.TestCase):
 
     @patch('chirpstack_api_wrapper.api.DeviceProfileServiceStub')
     @patch('chirpstack_api_wrapper.grpc.insecure_channel')
-    def test_get_device_other_grpc_error(self, mock_insecure_channel, mock_device_profile_service_stub):
+    def test_get_device_profile_other_grpc_error(self, mock_insecure_channel, mock_device_profile_service_stub):
         """
         Test get_device_profile() when grpc error is not NOT_FOUND or UNAUTHENTICATED
         """

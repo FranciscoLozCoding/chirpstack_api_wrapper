@@ -1,2 +1,3 @@
 chirpstack-api==4.*
 grpcio==1.*
+protobuf~=5.0

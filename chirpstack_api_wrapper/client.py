@@ -6,8 +6,13 @@ import os
 import time
 import requests
 from grpc import _channel as channel
+from google.protobuf.json_format import ParseDict
+from google.protobuf import empty_pb2
 from chirpstack_api import api
 from chirpstack_api_wrapper.objects import *
+
+#TODO: Refactor based on chatgpt suggestions: https://chatgpt.com/c/689ff792-55c8-832c-9afa-7ac1f6e504b3
+#TODO: Expand the client to include all chirpstack api(s) and methods.
 
 #Pagination
 LIMIT = 100 #Max number of records to return in the result-set.
@@ -17,7 +22,8 @@ class ChirpstackClient:
     """
     Chirpstack client to call Api(s).
 
-    Params:
+    Parameters
+    ----------
     - email: The email of the Account that will be used to call the Api(s).
     - password: The password of the Account that will be used to call the Api(s).
     - api_endpoint: The Chirpstack grpc api endpoint (usually port 8080).
@@ -93,7 +99,8 @@ class ChirpstackClient:
         """
         List all devices.
 
-        Params:
+        Parameters
+        ----------
         - app_resp: Response of ChirpstackClient.list_all_apps().
         """
         client = api.DeviceServiceStub(self.channel)
@@ -121,7 +128,8 @@ class ChirpstackClient:
         """
         List all apps.
 
-        Params:
+        Parameters
+        ----------
         - tenant_resp: Response of ChirpstackClient.list_tenants().
         """
         client = api.ApplicationServiceStub(self.channel)
@@ -171,7 +179,8 @@ class ChirpstackClient:
         """
         Get application.
 
-        Params:
+        Parameters
+        ----------
         - app_id: unique identifier of the app.
             Passing in an Application object will also work.
         """
@@ -206,7 +215,8 @@ class ChirpstackClient:
         """
         Get device.
 
-        Params:
+        Parameters
+        ----------
         - dev_eui: unique identifier of the device.
             Passing in a Device object will also work.
         """
@@ -241,7 +251,8 @@ class ChirpstackClient:
         """
         Get device profile.
 
-        Params:
+        Parameters
+        ----------
         - device_profile_id: unique identifier of the device profile.
             Passing in a Device Profile object will also work.
         """
@@ -276,7 +287,8 @@ class ChirpstackClient:
         """
         Get device Application key (Only OTAA).
 
-        Params:
+        Parameters
+        ----------
         - dev_eui: unique identifier of the device.
             Passing in a Device object will also work.
         - lw_v: The lorawan version the device is using. 
@@ -321,7 +333,8 @@ class ChirpstackClient:
         """
         Get Activation returns the current activation details of the device (OTAA or ABP).
 
-        Params:
+        Parameters
+        ----------
         - dev_eui: unique identifier of the device.
             Passing in a Device object will also work.
         """
@@ -356,7 +369,8 @@ class ChirpstackClient:
         """
         Get gateway.
 
-        Params:
+        Parameters
+        ----------
         - gateway_id (EUI64): Unique identifier for the gateway.
             Passing in a Gateway object will also work.
         """
@@ -391,7 +405,8 @@ class ChirpstackClient:
         """
         Create an Application.
 
-        Params:
+        Parameters
+        ----------
         - app: The app record to create.
         """
         if not isinstance(app, Application):
@@ -420,7 +435,8 @@ class ChirpstackClient:
         """
         Create a Device Profile.
 
-        Params:
+        Parameters
+        ----------
         - device_profile: The device profile record to create.
         """
         if not isinstance(device_profile, DeviceProfile):
@@ -472,7 +488,8 @@ class ChirpstackClient:
         """
         Create a Device.
 
-        Params:
+        Parameters
+        ----------
         - device: The device record to create.
         """
         if not isinstance(device, Device):
@@ -505,7 +522,8 @@ class ChirpstackClient:
         """
         Create device keys.
 
-        Params:
+        Parameters
+        ----------
         - device_keys: The device keys record to create.
         """
         client = api.DeviceServiceStub(self.channel)
@@ -528,7 +546,8 @@ class ChirpstackClient:
         """
         Create a Gateway.
 
-        Params:
+        Parameters
+        ----------
         - gateway: The gateway record to create.
         """
         if not isinstance(gateway, Gateway):
@@ -557,7 +576,8 @@ class ChirpstackClient:
         """
         Delete an Application.
 
-        Params:
+        Parameters
+        ----------
         - app_id: unique identifier of the application.
             Passing in an Application object will also work.
         """
@@ -579,7 +599,8 @@ class ChirpstackClient:
         """
         Delete a Device.
 
-        Params:
+        Parameters
+        ----------
         - dev_eui: The unique identifier of the device to delete.
             Passing in a Device object will also work.
         """
@@ -601,7 +622,8 @@ class ChirpstackClient:
         """
         Delete a Device Profile.
 
-        Params:
+        Parameters
+        ----------
         - device_profile_id: unique identifier of the device profile.
             Passing in a Device Profile object will also work.
         """
@@ -623,7 +645,8 @@ class ChirpstackClient:
         """
         Delete a Gateway.
 
-        Params:
+        Parameters
+        ----------
         - gateway_id (EUI64): Unique identifier for the gateway.
             Passing in a Gateway object will also work.
         """
@@ -663,7 +686,8 @@ class ChirpstackClient:
         Handle exception of ExpiredSignature, by logging into the server to refresh the jwt auth token
         and calling the method again that raised the exception.
 
-        Params:
+        Parameters
+        ----------
         - e: The RpcError thrown.
         - method: The ChirpstackClient method to call after the token is refreshed.
         - *args: Arguments that will be inputted to method.

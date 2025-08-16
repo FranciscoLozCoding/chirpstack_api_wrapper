@@ -39,7 +39,115 @@ class ChirpstackClient:
         if self.login_on_init:
             self.auth_token = self.login()
         else:
-            self.auth_token = None 
+            self.auth_token = None
+
+        
+    def _get_stub(self, service_name: str):
+        """
+        Return the gRPC stub class instance for *service_name*.
+
+        Parameters
+        ----------
+        service_name : str
+            Name of the gRPC service, e.g. ``"DeviceService"``.
+
+        Example
+        -------
+        stub = self._get_stub("DeviceService")  # returns api.DeviceServiceStub
+        """
+        try:
+            stub_cls = getattr(api, f"{service_name}Stub")
+            return stub_cls(self.channel)
+        except AttributeError as err:
+            raise ValueError(f"Unknown service '{service_name}'") from err
+
+    def _call_rpc(
+        self,
+        service_name: str,
+        rpc_name: str,
+        request_type: str | None = None,
+        params: dict | None = None,
+    ):
+        """
+        Generic RPC invoker used by all convenience wrappers.
+
+        * Automatically attaches JWT bearer token.
+        * Accepts params as dict → converted to protobuf with ParseDict.
+        * If `request_type == "google.protobuf.Empty"` or params is ``None``,
+          the request sent is ``google.protobuf.Empty()``.
+
+        Parameters
+        ----------
+        service_name : str
+            Name of the gRPC service, e.g. ``"DeviceService"``.
+        rpc_name : str
+            Name of the RPC method, e.g. ``"Get"``.
+        request_type : str, optional
+            Name of the request message type, e.g. ``"GetDeviceRequest"``.
+            If ``None``, it is assumed to be ``"{rpc_name}Request"``.
+        params : dict, optional
+            Fields to set in the request message.
+        """
+        if self.auth_token is None:
+            self.login()
+
+        client = self._get_stub(service_name)
+        rpc_fn = getattr(client, rpc_name)
+
+        # Determine request message class
+        if request_type is None:
+            request_type = f"{rpc_name}Request"
+
+        if request_type == "google.protobuf.Empty":
+            req_msg = empty_pb2.Empty()
+        else:
+            try:
+                req_cls = getattr(api, request_type)
+            except AttributeError as err:
+                raise ValueError(f"No message type '{request_type}'") from err
+            req_msg = ParseDict(params or {}, req_cls())
+
+        metadata = [("authorization", f"Bearer {self.auth_token}")]
+        try:
+            return rpc_fn(req_msg, metadata=metadata)
+        except grpc.RpcError as e:
+            # transparently refresh if token expired
+            return self.refresh_token(e, self._call_rpc,
+                                      service_name, rpc_name,
+                                      request_type, params)
+
+    def _list_with_pagination(
+        self,
+        service_name: str,
+        request_dict: dict,
+        request_type: str | None = None,
+        result_field: str = "result",
+        limit: int = LIMIT,
+    ) -> list:
+        """
+        Aggregate all pages for any <Service>.List RPC.
+
+        Parameters
+        ----------
+        service_name : str
+            Name of the gRPC service, e.g. ``"DeviceService"``.
+        request_dict : dict
+            Fields for the ``List*Request`` message (offset/limit filled in here).
+        result_field : str
+            Usually ``"result"`` – the repeated field in the List response.
+        limit : int
+            Page size. Uses global ``LIMIT`` constant by default.
+        """
+        records: list = []
+        offset = 0
+        while True:
+            request_dict.update(limit=limit, offset=offset)
+            resp = self._call_rpc(service_name, "List", request_type=request_type, params=request_dict)
+            records.extend(getattr(resp, result_field))
+            if len(records) >= resp.total_count:
+                break
+            offset += limit
+        return records
 
     def login(self) -> str:
         """
@@ -62,11 +170,9 @@ class ChirpstackClient:
             details = e.details()
             
             if status_code == grpc.StatusCode.UNAVAILABLE:
-                logging.error("ChirpstackClient.login(): Service is unavailable. This might be a DNS resolution issue.")
-                logging.error(f"    Details: {details}")
+                logging.error(f"ChirpstackClient.login(): Service is unavailable. This might be a DNS resolution issue. - {details}")
             else:
-                logging.error(f"ChirpstackClient.login(): An error occurred with status code {status_code}")
-                logging.error(f"    Details: {details}")
+                logging.error(f"ChirpstackClient.login(): An error occurred with status code {status_code} - {details}")
 
             # Exit with a non-zero status code to indicate failure
             sys.exit(1)
@@ -95,7 +201,7 @@ class ChirpstackClient:
             logging.error(f"ChirpstackClient.ping(): {e}")
             return False
 
-    def list_all_devices(self,app_resp: dict) -> dict:
+    def list_all_devices(self, apps: list[api.ApplicationListItem]) -> list[api.DeviceListItem]:
         """
         List all devices.
 
@@ -103,28 +209,18 @@ class ChirpstackClient:
         ----------
         - app_resp: Response of ChirpstackClient.list_all_apps().
         """
-        client = api.DeviceServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
         devices = []
-        for app in app_resp:
-            # Construct request.
-            req = api.ListDevicesRequest()
-            req.limit = LIMIT
-            req.offset = 0 #get first page
-            req.application_id = app.id #Application ID (UUID) to filter devices on.
-            #req.search = "" #If set, the given string will be used to search on name (optional).
-
-            try:
-                devices.extend(self.List_agg_pagination(client,req,metadata))
-            except grpc.RpcError as e:
-                return self.refresh_token(e, self.list_all_devices, app_resp)
-
+        for app in apps:
+            devices.extend(
+                self._list_with_pagination(
+                    "DeviceService",
+                    {"application_id": app.id},
+                    "ListDevicesRequest"
+                )
+            )
         return devices
 
-    def list_all_apps(self,tenant_resp: dict) -> dict:
+    def list_all_apps(self, tenants: list[api.TenantListItem]) -> list[api.ApplicationListItem]:
         """
         List all apps.
 
@@ -132,50 +228,24 @@ class ChirpstackClient:
         ----------
         - tenant_resp: Response of ChirpstackClient.list_tenants().
         """
-        client = api.ApplicationServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
         apps = []
-
-        for tenant in tenant_resp:
-            # Construct request
-            req = api.ListApplicationsRequest()
-            req.limit = LIMIT
-            req.offset = 0 #get first page
-            req.tenant_id = tenant.id #Tenant ID to list the applications for.
-            #req.search = "" #If set, the given string will be used to search on name (optional).
-
-            try:
-                apps.extend(self.List_agg_pagination(client,req,metadata))
-            except grpc.RpcError as e:
-                return self.refresh_token(e, self.list_all_apps, tenant_resp)
-
+        for t in tenants:
+            apps.extend(
+                self._list_with_pagination(
+                    "ApplicationService",
+                    {"tenant_id": t.id},
+                    "ListApplicationsRequest"
+                )
+            )
         return apps
 
-    def list_tenants(self) -> dict:
+    def list_tenants(self) -> list[api.TenantListItem]:
         """
         List all tenants.
         """
-        client = api.TenantServiceStub(self.channel)
+        return self._list_with_pagination("TenantService", {}, "ListTenantsRequest")
 
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.ListTenantsRequest()
-        req.limit = LIMIT
-        req.offset = 0 #get first page
-        #req.search = "" #If set, the given string will be used to search on name (optional).
-        #req.user_id = "" #If set, filters the result set to the tenants of the user. Only global API keys are able to filter by this field.
-
-        try:
-            return self.List_agg_pagination(client,req,metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.list_tenants)
-
-    def get_app(self,app_id: str) -> dict:
+    def get_app(self, app_id: api.Application | str) -> api.GetApplicationResponse | dict:
         """
         Get application.
 
@@ -184,34 +254,18 @@ class ChirpstackClient:
         - app_id: unique identifier of the app.
             Passing in an Application object will also work.
         """
-        client = api.ApplicationServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.GetApplicationRequest()
-        req.id = str(app_id)
-
         try:
-            return client.Get(req, metadata=metadata)
+            return self._call_rpc("ApplicationService", "Get",
+                                 "GetApplicationRequest", {"id": str(app_id)})
         except grpc.RpcError as e:
-
-            status_code = e.code()
-            details = e.details()
-
+            status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error("ChirpstackClient.get_app(): The application does not exist")
-                logging.error(f"    Details: {details}")
-            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
-                return self.refresh_token(e, self.get_app, app_id)
+                logging.error(f"ChirpstackClient.get_app(): Application {app_id} not found - {details}")
             else:
-                logging.error(f"ChirpstackClient.get_app(): An error occurred with status code {status_code}")
-                logging.error(f"    Details: {details}")
-            
+                logging.error(f"ChirpstackClient.get_app(): An error occurred with status code {status_code} - {details}")
             return {}
 
-    def get_device(self, dev_eui: str) -> dict:
+    def get_device(self, dev_eui: api.Device | str) -> api.GetDeviceResponse | dict:
         """
         Get device.
 
@@ -220,34 +274,18 @@ class ChirpstackClient:
         - dev_eui: unique identifier of the device.
             Passing in a Device object will also work.
         """
-        client = api.DeviceServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.GetDeviceRequest()
-        req.dev_eui = str(dev_eui)
-
         try:
-            return client.Get(req, metadata=metadata)
+            return self._call_rpc("DeviceService", "Get",
+                             "GetDeviceRequest", {"dev_eui": str(dev_eui)})
         except grpc.RpcError as e:
-
-            status_code = e.code()
-            details = e.details()
-
+            status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error("ChirpstackClient.get_device(): The device does not exist")
-                logging.error(f"    Details: {details}")
-            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
-                return self.refresh_token(e, self.get_device, dev_eui)
+                logging.error(f"ChirpstackClient.get_device(): Device {dev_eui} not found - {details}")
             else:
-                logging.error(f"ChirpstackClient.get_device(): An error occurred with status code {status_code}")
-                logging.error(f"    Details: {details}")
-            
+                logging.error(f"ChirpstackClient.get_app(): An error occurred with status code {status_code} - {details}")
             return {}
-
-    def get_device_profile(self,device_profile_id: str) -> dict:
+        
+    def get_device_profile(self, device_profile_id: api.DeviceProfile | str) -> api.GetDeviceProfileResponse | dict:
         """
         Get device profile.
 
@@ -256,34 +294,18 @@ class ChirpstackClient:
         - device_profile_id: unique identifier of the device profile.
             Passing in a Device Profile object will also work.
         """
-        client = api.DeviceProfileServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.GetDeviceProfileRequest()
-        req.id = str(device_profile_id)
-
         try:
-            return client.Get(req, metadata=metadata)
+            return self._call_rpc("DeviceProfileService", "Get",
+                                 "GetDeviceProfileRequest", {"id": str(device_profile_id)})
         except grpc.RpcError as e:
-
-            status_code = e.code()
-            details = e.details()
-
+            status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error("ChirpstackClient.get_device_profile(): The device profile does not exist")
-                logging.error(f"    Details: {details}")
-            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
-                return self.refresh_token(e, self.get_device_profile, device_profile_id)
+                logging.error(f"ChirpstackClient.get_device_profile(): Device Profile {device_profile_id} not found - {details}")
             else:
-                logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code}")
-                logging.error(f"    Details: {details}")
-            
+                logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code} - {details}")
             return {}
-    
-    def get_device_app_key(self,deveui: str,lw_v: int) -> str:
+        
+    def get_device_app_key(self, deveui: api.Device | str, lw_v: MacVersion | int) -> str:
         """
         Get device Application key (Only OTAA).
 
@@ -294,42 +316,24 @@ class ChirpstackClient:
         - lw_v: The lorawan version the device is using. 
             input directly from ChirpstackClient.get_device_profile() output or use MacVersion Object.
         """
-        client = api.DeviceServiceStub(self.channel)
-
-        #define the JWT key metadata
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #construct request
-        req = api.GetDeviceKeysRequest()
-        req.dev_eui = str(deveui)
-
         try:
-            resp = client.GetKeys(req, metadata=metadata)
+            resp = self._call_rpc("DeviceService", "GetKeys",
+                                 "GetDeviceKeysRequest", {"dev_eui": str(deveui)})
+            # what key to return is based on lorawan version (For LoRaWAN 1.1 devices return app_key)
+            # < 5 is lorawan 1.0.x
+            return resp.device_keys.nwk_key if lw_v < 5 else resp.device_keys.app_key
         except grpc.RpcError as e:
-
-            status_code = e.code()
-            details = e.details()
+            status_code, details = e.code(), e.details()
 
             if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error("ChirpstackClient.get_device_app_key(): The device key does not exist. It is possible that the device is using ABP which does not use an application key")
-                logging.error(f"    Details: {details}")
+                logging.error(f"ChirpstackClient.get_device_app_key(): The device key does not exist. It is possible that the device is using ABP which does not use an application key - {details}")
             elif status_code == grpc.StatusCode.UNAUTHENTICATED:
-                return self.refresh_token(e, self.get_device_app_key, deveui, lw_v)
+                return self.refresh_token(e, self._get_device_app_key, deveui, lw_v)
             else:
-                logging.error(f"ChirpstackClient.get_device_app_key(): An error occurred with status code {status_code}")
-                logging.error(f"    Details: {details}")
+                logging.error(f"ChirpstackClient.get_device_app_key(): An error occurred with status code {status_code} - {details}")
+            return ""
 
-            return
-        except Exception as e:
-            # Handle other exceptions
-            logging.error(f"ChirpstackClient.get_device_app_key(): An error occurred: {e}")
-            return
-        
-        # what key to return is based on lorawan version (For LoRaWAN 1.1 devices return app_key)
-        # < 5 is lorawan 1.0.x
-        return resp.device_keys.nwk_key if lw_v < 5 else resp.device_keys.app_key
-
-    def get_device_activation(self,deveui: str) -> dict:
+    def get_device_activation(self, deveui: api.Device | str) -> api.GetDeviceActivationResponse | dict:
         """
         Get Activation returns the current activation details of the device (OTAA or ABP).
 
@@ -338,34 +342,18 @@ class ChirpstackClient:
         - dev_eui: unique identifier of the device.
             Passing in a Device object will also work.
         """
-        client = api.DeviceServiceStub(self.channel)
-
-        #define the JWT key metadata
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #construct request
-        req = api.GetDeviceActivationRequest()
-        req.dev_eui = str(deveui)
-
         try:
-            return client.GetActivation(req, metadata=metadata)
+            return self._call_rpc("DeviceService", "GetActivation",
+                                 "GetDeviceActivationRequest", {"dev_eui": str(deveui)})
         except grpc.RpcError as e:
-
-            status_code = e.code()
-            details = e.details()
-
+            status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error("ChirpstackClient.get_device_activation(): The device activation does not exist")
-                logging.error(f"    Details: {details}")
-            elif status_code == grpc.StatusCode.UNAUTHENTICATED:
-                return self.refresh_token(e, self.get_device_activation, deveui)
+                logging.error(f"ChirpstackClient.get_device_activation(): Device Activation {deveui} not found - {details}")
             else:
-                logging.error(f"ChirpstackClient.get_device_activation(): An error occurred with status code {status_code}")
-                logging.error(f"    Details: {details}")
-            
+                logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code} - {details}")
             return {}
 
-    def get_gateway(self,gateway_id:str) -> dict:
+    def get_gateway(self, gateway_id: api.Gateway | str) -> api.GetGatewayResponse | dict:
         """
         Get gateway.
 
@@ -374,33 +362,20 @@ class ChirpstackClient:
         - gateway_id (EUI64): Unique identifier for the gateway.
             Passing in a Gateway object will also work.
         """
-        client = api.GatewayServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.GetGatewayRequest()
-        req.gateway_id = str(gateway_id)
-
         try:
-            return client.Get(req, metadata=metadata)
+            return self._call_rpc("GatewayService", "Get",
+                                 "GetGatewayRequest", {"gateway_id": str(gateway_id)})
         except grpc.RpcError as e:
-
-            status_code = e.code()
-            details = e.details()
+            status_code, details = e.code(), e.details()
 
             if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error("ChirpstackClient.get_gateway(): The gateway does not exist")
-                logging.error(f"    Details: {details}")
+                logging.error(f"ChirpstackClient.get_gateway(): Gateway {gateway_id} not found - {details}")
             elif status_code == grpc.StatusCode.UNAUTHENTICATED:
-                return self.refresh_token(e, self.get_gateway, gateway_id)
+                return self.refresh_token(e, self._get_gateway, gateway_id)
             else:
-                logging.error(f"ChirpstackClient.get_gateway(): An error occurred with status code {status_code}")
-                logging.error(f"    Details: {details}")
-            
+                logging.error(f"ChirpstackClient.get_gateway(): An error occurred with status code {status_code} - {details}")
             return {}
-
+    
     def create_app(self,app:Application) -> None:
         """
         Create an Application.
@@ -411,26 +386,19 @@ class ChirpstackClient:
         """
         if not isinstance(app, Application):
             raise TypeError("Expected Application object")
-
-        client = api.ApplicationServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.CreateApplicationRequest()
-        req.application.name = app.name
-        req.application.description = app.description
-        req.application.tenant_id = app.tenant_id
-        req.application.tags.update(app.tags)
-
-        try:
-            resp = client.Create(req, metadata=metadata)
-            app.id = resp.id #attach chirp generated uuid to app object
-            return 
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.create_app, app)
-
+        
+        resp = self._call_rpc("ApplicationService", "Create",
+                                    "CreateApplicationRequest", {
+                                        "application": {
+                                            "name": app.name,
+                                            "description": app.description,
+                                            "tenant_id": app.tenant_id,
+                                            "tags": app.tags
+                                        }
+                                    })
+        app.id = resp.id #attach chirp generated uuid to app object
+        return
+    
     def create_device_profile(self,device_profile:DeviceProfile) -> None:
         """
         Create a Device Profile.
@@ -441,49 +409,42 @@ class ChirpstackClient:
         """
         if not isinstance(device_profile, DeviceProfile):
             raise TypeError("Expected DeviceProfile object")
-
-        client = api.DeviceProfileServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.CreateDeviceProfileRequest()
-        req.device_profile.name = device_profile.name
-        req.device_profile.tenant_id = device_profile.tenant_id
-        req.device_profile.region = device_profile.region
-        req.device_profile.mac_version = device_profile.mac_version
-        req.device_profile.reg_params_revision = device_profile.reg_params_revision
-        req.device_profile.uplink_interval = device_profile.uplink_interval
-        req.device_profile.supports_otaa = device_profile.supports_otaa
-        req.device_profile.abp_rx1_delay = device_profile.abp_rx1_delay if device_profile.abp_rx1_delay is not None else 0
-        req.device_profile.abp_rx1_dr_offset = device_profile.abp_rx1_dr_offset if device_profile.abp_rx1_dr_offset is not None else 0
-        req.device_profile.abp_rx2_dr = device_profile.abp_rx2_dr if device_profile.abp_rx2_dr is not None else 0
-        req.device_profile.abp_rx2_freq = device_profile.abp_rx2_freq if device_profile.abp_rx2_freq is not None else 0
-        req.device_profile.supports_class_b = device_profile.supports_class_b
-        req.device_profile.class_b_timeout = device_profile.class_b_timeout if device_profile.class_b_timeout is not None else 0
-        req.device_profile.class_b_ping_slot_nb_k = device_profile.class_b_ping_slot_nb_k if device_profile.class_b_ping_slot_nb_k is not None else 0
-        req.device_profile.class_b_ping_slot_dr = device_profile.class_b_ping_slot_dr if device_profile.class_b_ping_slot_dr is not None else 0
-        req.device_profile.class_b_ping_slot_freq = device_profile.class_b_ping_slot_freq if device_profile.class_b_ping_slot_freq is not None else 0
-        req.device_profile.supports_class_c = device_profile.supports_class_c
-        req.device_profile.class_c_timeout = device_profile.class_c_timeout if device_profile.class_c_timeout is not None else 0
-        req.device_profile.description = device_profile.description
-        req.device_profile.payload_codec_runtime = device_profile.payload_codec_runtime
-        req.device_profile.payload_codec_script = device_profile.payload_codec_script
-        req.device_profile.flush_queue_on_activate = device_profile.flush_queue_on_activate
-        req.device_profile.device_status_req_interval = device_profile.device_status_req_interval
-        req.device_profile.auto_detect_measurements = device_profile.auto_detect_measurements
-        req.device_profile.allow_roaming = device_profile.allow_roaming
-        req.device_profile.adr_algorithm_id = device_profile.adr_algorithm_id
-        req.device_profile.tags.update(device_profile.tags)
-
-        try:
-            resp = client.Create(req, metadata=metadata)
-            device_profile.id = resp.id #attach chirp generated uuid to device profile object
-            return 
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.create_device_profile, device_profile)
-
+        
+        resp = self._call_rpc("DeviceProfileService", "Create",
+                                    "CreateDeviceProfileRequest", {
+                                        "device_profile": {
+                                            "name": device_profile.name,
+                                            "tenant_id": device_profile.tenant_id,
+                                            "region": device_profile.region,
+                                            "mac_version": device_profile.mac_version,
+                                            "reg_params_revision": device_profile.reg_params_revision,
+                                            "uplink_interval": device_profile.uplink_interval,
+                                            "supports_otaa": device_profile.supports_otaa,
+                                            "abp_rx1_delay": device_profile.abp_rx1_delay if device_profile.abp_rx1_delay is not None else 0,
+                                            "abp_rx1_dr_offset": device_profile.abp_rx1_dr_offset if device_profile.abp_rx1_dr_offset is not None else 0,
+                                            "abp_rx2_dr": device_profile.abp_rx2_dr if device_profile.abp_rx2_dr is not None else 0,
+                                            "abp_rx2_freq": device_profile.abp_rx2_freq if device_profile.abp_rx2_freq is not None else 0,
+                                            "supports_class_b": device_profile.supports_class_b,
+                                            "class_b_timeout": device_profile.class_b_timeout if device_profile.class_b_timeout is not None else 0,
+                                            "class_b_ping_slot_nb_k": device_profile.class_b_ping_slot_nb_k if device_profile.class_b_ping_slot_nb_k is not None else 0,
+                                            "class_b_ping_slot_dr": device_profile.class_b_ping_slot_dr if device_profile.class_b_ping_slot_dr is not None else 0,
+                                            "class_b_ping_slot_freq": device_profile.class_b_ping_slot_freq if device_profile.class_b_ping_slot_freq is not None else 0,
+                                            "supports_class_c": device_profile.supports_class_c,
+                                            "class_c_timeout": device_profile.class_c_timeout if device_profile.class_c_timeout is not None else 0,
+                                            "description": device_profile.description,
+                                            "payload_codec_runtime": device_profile.payload_codec_runtime,
+                                            "payload_codec_script": device_profile.payload_codec_script,
+                                            "flush_queue_on_activate": device_profile.flush_queue_on_activate,
+                                            "device_status_req_interval": device_profile.device_status_req_interval,
+                                            "auto_detect_measurements": device_profile.auto_detect_measurements,
+                                            "allow_roaming": device_profile.allow_roaming,
+                                            "adr_algorithm_id": device_profile.adr_algorithm_id,
+                                            "tags": device_profile.tags
+                                        }
+                                    })
+        device_profile.id = resp.id #attach chirp generated uuid to device profile object
+        return
+    
     def create_device(self,device:Device) -> None:
         """
         Create a Device.
@@ -494,29 +455,23 @@ class ChirpstackClient:
         """
         if not isinstance(device, Device):
             raise TypeError("Expected Device object")
-
-        client = api.DeviceServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.CreateDeviceRequest()
-        req.device.name = device.name
-        req.device.dev_eui = device.dev_eui
-        req.device.application_id = device.application_id
-        req.device.device_profile_id = device.device_profile_id
-        req.device.join_eui = device.join_eui
-        req.device.description = device.description
-        req.device.skip_fcnt_check = device.skip_fcnt_check
-        req.device.is_disabled = device.is_disabled
-        req.device.tags.update(device.tags)
-        req.device.variables.update(device.variables)
-
-        try:
-            return client.Create(req, metadata=metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.create_device, device)
+        resp = self._call_rpc("DeviceService", "Create",
+                                    "CreateDeviceRequest", {
+                                        "device": {
+                                            "name": device.name,
+                                            "dev_eui": device.dev_eui,
+                                            "application_id": device.application_id,
+                                            "device_profile_id": device.device_profile_id,
+                                            "join_eui": device.join_eui,
+                                            "description": device.description,
+                                            "skip_fcnt_check": device.skip_fcnt_check,
+                                            "is_disabled": device.is_disabled,
+                                            "tags": device.tags,
+                                            "variables": device.variables
+                                        }
+                                    })
+        device.dev_eui = resp.dev_eui #attach chirp generated dev_eui to device object
+        return
 
     def create_device_keys(self,device_keys:DeviceKeys) -> None:
         """
@@ -526,22 +481,18 @@ class ChirpstackClient:
         ----------
         - device_keys: The device keys record to create.
         """
-        client = api.DeviceServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.CreateDeviceKeysRequest()
-        req.device_keys.dev_eui = device_keys.dev_eui
-        req.device_keys.nwk_key = device_keys.nwk_key
-        req.device_keys.app_key = device_keys.app_key
-
-        try:
-            return client.CreateKeys(req, metadata=metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.create_device_keys, device_keys)
-
+        if not isinstance(device_keys, DeviceKeys):
+            raise TypeError("Expected DeviceKeys object")
+        
+        return self._call_rpc("DeviceService", "CreateKeys",
+                                "CreateDeviceKeysRequest", {
+                                "device_keys": {
+                                    "dev_eui": device_keys.dev_eui,
+                                    "nwk_key": device_keys.nwk_key,
+                                    "app_key": device_keys.app_key
+                                }
+                                })
+    
     def create_gateway(self,gateway:Gateway) -> None:
         """
         Create a Gateway.
@@ -552,27 +503,22 @@ class ChirpstackClient:
         """
         if not isinstance(gateway, Gateway):
             raise TypeError("Expected Gateway object")
-
-        client = api.GatewayServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.CreateGatewayRequest()
-        req.gateway.gateway_id = gateway.gateway_id
-        req.gateway.name = gateway.name
-        req.gateway.description = gateway.description
-        req.gateway.tenant_id = gateway.tenant_id
-        req.gateway.stats_interval = gateway.stats_interval
-        req.gateway.tags.update(gateway.tags)
-
-        try:
-            return client.Create(req, metadata=metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.create_gateway, gateway)
-
-    def delete_app(self, app_id:str) -> None:
+        
+        resp = self._call_rpc("GatewayService", "Create",
+                                    "CreateGatewayRequest", {
+                                        "gateway": {
+                                            "gateway_id": gateway.gateway_id,
+                                            "name": gateway.name,
+                                            "description": gateway.description,
+                                            "tenant_id": gateway.tenant_id,
+                                            "stats_interval": gateway.stats_interval,
+                                            "tags": gateway.tags
+                                        }
+                                    })
+        gateway.id = resp.id #attach chirp generated uuid to gateway object
+        return
+    
+    def delete_app(self, app_id: api.Application | str) -> None:
         """
         Delete an Application.
 
@@ -581,21 +527,10 @@ class ChirpstackClient:
         - app_id: unique identifier of the application.
             Passing in an Application object will also work.
         """
-        client = api.ApplicationServiceStub(self.channel)
+        return self._call_rpc("ApplicationService", "Delete",
+                             "DeleteApplicationRequest", {"id": str(app_id)})
 
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.DeleteApplicationRequest()
-        req.id = str(app_id)
-
-        try:
-            return client.Delete(req, metadata=metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.delete_app, app_id)
-
-    def delete_device(self, dev_eui:str) -> None:
+    def delete_device(self, dev_eui: api.Device | str) -> None:
         """
         Delete a Device.
 
@@ -604,21 +539,10 @@ class ChirpstackClient:
         - dev_eui: The unique identifier of the device to delete.
             Passing in a Device object will also work.
         """
-        client = api.DeviceServiceStub(self.channel)
+        return self._call_rpc("DeviceService", "Delete",
+                             "DeleteDeviceRequest", {"dev_eui": str(dev_eui)})
 
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.DeleteDeviceRequest()
-        req.dev_eui = str(dev_eui)
-
-        try:
-            return client.Delete(req, metadata=metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.delete_device, dev_eui)
-
-    def delete_device_profile(self, device_profile_id:str) -> None:
+    def delete_device_profile(self, device_profile_id: api.DeviceProfile | str) -> None:
         """
         Delete a Device Profile.
 
@@ -627,21 +551,10 @@ class ChirpstackClient:
         - device_profile_id: unique identifier of the device profile.
             Passing in a Device Profile object will also work.
         """
-        client = api.DeviceProfileServiceStub(self.channel)
+        return self._call_rpc("DeviceProfileService", "Delete",
+                             "DeleteDeviceProfileRequest", {"id": str(device_profile_id)})
 
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.DeleteDeviceProfileRequest()
-        req.id = str(device_profile_id)
-
-        try:
-            return client.Delete(req, metadata=metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.delete_device_profile, device_profile_id)
-
-    def delete_gateway(self, gateway_id:str) -> None:
+    def delete_gateway(self, gateway_id: api.Gateway | str) -> None:
         """
         Delete a Gateway.
 
@@ -650,36 +563,8 @@ class ChirpstackClient:
         - gateway_id (EUI64): Unique identifier for the gateway.
             Passing in a Gateway object will also work.
         """
-        client = api.GatewayServiceStub(self.channel)
-
-        # Define the JWT key metadata.
-        metadata = [("authorization", "Bearer %s" % self.auth_token)]
-
-        #Construct request
-        req = api.DeleteGatewayRequest()
-        req.gateway_id = str(gateway_id)
-
-        try:
-            return client.Delete(req, metadata=metadata)
-        except grpc.RpcError as e:
-            return self.refresh_token(e, self.delete_gateway, gateway_id)
-
-    @staticmethod
-    def List_agg_pagination(client,req,metadata) -> dict:
-        """
-        This method aggregates all the result-sets in pagination from rpc List into one list.
-        """
-        records=[]
-        while True:
-            resp = client.List(req, metadata=metadata)
-            records.extend(resp.result)
-
-            req.offset += OFFSET
-
-            if (len(records) == resp.total_count):
-                break
-
-        return records
+        return self._call_rpc("GatewayService", "Delete",
+                             "DeleteGatewayRequest", {"id": str(gateway_id)})
 
     def refresh_token(self, e: grpc.RpcError, method, *args, **kwargs):
         """
@@ -694,8 +579,7 @@ class ChirpstackClient:
         - **kwargs: Key Word Arguments that will be inputted to method.
         """
         # Handle the exception here
-        status_code = e.code()
-        details = e.details()
+        status_code, details = e.code(), e.details()
 
         if status_code == grpc.StatusCode.UNAUTHENTICATED and "ExpiredSignature" in details:
             # Retry login and then re-run the specified method
@@ -708,6 +592,5 @@ class ChirpstackClient:
             time.sleep(2)  # Introduce a short delay before retrying
             return method(*args, **kwargs)  # Re-run the specified method with the same parameters
 
-        logging.error(f"ChirpstackClient.{method.__name__}(): Unknown error occurred with status code {status_code}")
-        logging.error(f"    Details: {details}")
+        logging.error(f"ChirpstackClient.{method.__name__}(): Unknown error occurred with status code {status_code} - {details}")
         raise Exception(f"The JWT token failed to be refreshed")

@@ -240,7 +240,7 @@ class ChirpstackClient:
         """
         return self._list_with_pagination("TenantService", {}, "ListTenantsRequest")
 
-    def get_app(self, app_id: api.Application | str) -> api.GetApplicationResponse | dict:
+    def get_app(self, app_id: api.Application | str) -> Application | None:
         """
         Get application.
 
@@ -248,19 +248,36 @@ class ChirpstackClient:
         ----------
         - app_id: unique identifier of the app.
             Passing in an Application object will also work.
+
+        Returns
+        -------
+        - Application object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "Get",
-                                 "GetApplicationRequest", {"id": str(app_id)})
+            response = self._call_rpc("ApplicationService", "Get",
+                                     "GetApplicationRequest", {"id": str(app_id)})
+            
+            if not response or not hasattr(response, 'application'):
+                return None
+            
+            app = Application(
+                name=response.application.name,
+                tenant_id=response.application.tenant_id,
+                id=response.application.id,
+                description=response.application.description,
+                tags=dict(response.application.tags)
+            )
+            return app
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_app(): Application {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_app(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
-    def get_device(self, dev_eui: api.Device | str) -> api.GetDeviceResponse | dict:
+    def get_device(self, dev_eui: api.Device | str) -> Device | None:
         """
         Get device.
 
@@ -268,19 +285,41 @@ class ChirpstackClient:
         ----------
         - dev_eui: unique identifier of the device.
             Passing in a Device object will also work.
+
+        Returns
+        -------
+        - Device object or None if not found.
         """
         try:
-            return self._call_rpc("DeviceService", "Get",
-                             "GetDeviceRequest", {"dev_eui": str(dev_eui)})
+            response = self._call_rpc("DeviceService", "Get",
+                                     "GetDeviceRequest", {"dev_eui": str(dev_eui)})
+            
+            if not response or not hasattr(response, 'device'):
+                return None
+            
+            device = Device(
+                name=response.device.name,
+                dev_eui=response.device.dev_eui,
+                application_id=response.device.application_id,
+                device_profile_id=response.device.device_profile_id,
+                join_eui=response.device.join_eui,
+                description=response.device.description,
+                skip_fcnt_check=response.device.skip_fcnt_check,
+                is_disabled=response.device.is_disabled,
+                tags=dict(response.device.tags),
+                variables=dict(response.device.variables)
+            )
+            return device
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_device(): Device {dev_eui} not found - {details}")
             else:
-                logging.error(f"ChirpstackClient.get_app(): An error occurred with status code {status_code} - {details}")
-            return {}
+                logging.error(f"ChirpstackClient.get_device(): An error occurred with status code {status_code} - {details}")
+            return None
         
-    def get_device_profile(self, device_profile_id: api.DeviceProfile | str) -> api.GetDeviceProfileResponse | dict:
+    def get_device_profile(self, device_profile_id: api.DeviceProfile | str) -> DeviceProfile | None:
         """
         Get device profile.
 
@@ -288,17 +327,97 @@ class ChirpstackClient:
         ----------
         - device_profile_id: unique identifier of the device profile.
             Passing in a Device Profile object will also work.
+
+        Returns
+        -------
+        - DeviceProfile object or None if not found.
         """
         try:
-            return self._call_rpc("DeviceProfileService", "Get",
-                                 "GetDeviceProfileRequest", {"id": str(device_profile_id)})
+            response = self._call_rpc("DeviceProfileService", "Get",
+                                     "GetDeviceProfileRequest", {"id": str(device_profile_id)})
+            
+            if not response or not hasattr(response, 'device_profile'):
+                return None
+            
+            # Import the enums here to avoid circular imports
+            from chirpstack_api_wrapper.objects import Region, MacVersion, RegParamsRevision, CodecRuntime, AdrAlgorithm, ClassBPingSlot, CadPeriodicity, SecondChAckOffset, RelayModeActivation
+            
+            # Find the enum values by comparing the response values
+            region_enum = next((r for r in Region if r.value == response.device_profile.region), Region.EU868)
+            mac_version_enum = next((m for m in MacVersion if m.value == response.device_profile.mac_version), MacVersion.LORAWAN_1_0_0)
+            reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == response.device_profile.reg_params_revision), RegParamsRevision.A)
+            payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == response.device_profile.payload_codec_runtime), CodecRuntime.NONE)
+            adr_algorithm_enum = next((a for a in AdrAlgorithm if a.value == response.device_profile.adr_algorithm_id), AdrAlgorithm.LORA_ONLY)
+            class_b_ping_slot_nb_k_enum = next((c for c in ClassBPingSlot if c.value == response.device_profile.class_b_ping_slot_periodicity), ClassBPingSlot.NONE)
+            relay_cad_periodicity_enum = next((c for c in CadPeriodicity if c.value == response.device_profile.relay_cad_periodicity), CadPeriodicity.NONE)
+            relay_second_channel_ack_offset_enum = next((s for s in SecondChAckOffset if s.value == response.device_profile.relay_second_channel_ack_offset), SecondChAckOffset.NONE)
+            relay_ed_activation_mode_enum = next((r for r in RelayModeActivation if r.value == response.device_profile.relay_ed_activation_mode), RelayModeActivation.DISABLED)
+            
+            device_profile = DeviceProfile(
+                name=response.device_profile.name,
+                tenant_id=response.device_profile.tenant_id,
+                region=region_enum,
+                mac_version=mac_version_enum,
+                reg_params_revision=reg_params_revision_enum,
+                uplink_interval=response.device_profile.uplink_interval,
+                supports_otaa=response.device_profile.supports_otaa,
+                supports_class_b=response.device_profile.supports_class_b,
+                supports_class_c=response.device_profile.supports_class_c,
+                abp_rx1_delay=response.device_profile.abp_rx1_delay,
+                abp_rx1_dr_offset=response.device_profile.abp_rx1_dr_offset,
+                abp_rx2_dr=response.device_profile.abp_rx2_dr,
+                abp_rx2_freq=response.device_profile.abp_rx2_freq,
+                class_b_timeout=response.device_profile.class_b_timeout,
+                class_b_ping_slot_nb_k=class_b_ping_slot_nb_k_enum,
+                class_b_ping_slot_dr=response.device_profile.class_b_ping_slot_dr,
+                class_b_ping_slot_freq=response.device_profile.class_b_ping_slot_freq,
+                class_c_timeout=response.device_profile.class_c_timeout,
+                id=response.device_profile.id,
+                description=response.device_profile.description,
+                payload_codec_runtime=payload_codec_runtime_enum,
+                payload_codec_script=response.device_profile.payload_codec_script,
+                flush_queue_on_activate=response.device_profile.flush_queue_on_activate,
+                device_status_req_interval=response.device_profile.device_status_req_interval,
+                tags=dict(response.device_profile.tags),
+                auto_detect_measurements=response.device_profile.auto_detect_measurements,
+                allow_roaming=response.device_profile.allow_roaming,
+                adr_algorithm_id=adr_algorithm_enum,
+                rx1_delay=response.device_profile.rx1_delay,
+                app_layer_params=dict(response.device_profile.app_layer_params) if hasattr(response.device_profile, 'app_layer_params') else {},
+                region_config_id=response.device_profile.region_config_id,
+                is_relay=response.device_profile.is_relay,
+                is_relay_ed=response.device_profile.is_relay_ed,
+                relay_ed_relay_only=response.device_profile.relay_ed_relay_only,
+                relay_enabled=response.device_profile.relay_enabled,
+                relay_cad_periodicity=relay_cad_periodicity_enum,
+                relay_default_channel_index=response.device_profile.relay_default_channel_index,
+                relay_second_channel_freq=response.device_profile.relay_second_channel_freq,
+                relay_second_channel_dr=response.device_profile.relay_second_channel_dr,
+                relay_second_channel_ack_offset=relay_second_channel_ack_offset_enum,
+                relay_ed_activation_mode=relay_ed_activation_mode_enum,
+                relay_ed_smart_enable_level=response.device_profile.relay_ed_smart_enable_level,
+                relay_ed_back_off=response.device_profile.relay_ed_back_off,
+                relay_ed_uplink_limit_bucket_size=response.device_profile.relay_ed_uplink_limit_bucket_size,
+                relay_ed_uplink_limit_reload_rate=response.device_profile.relay_ed_uplink_limit_reload_rate,
+                relay_join_req_limit_reload_rate=response.device_profile.relay_join_req_limit_reload_rate,
+                relay_notify_limit_reload_rate=response.device_profile.relay_notify_limit_reload_rate,
+                relay_global_uplink_limit_reload_rate=response.device_profile.relay_global_uplink_limit_reload_rate,
+                relay_overall_limit_reload_rate=response.device_profile.relay_overall_limit_reload_rate,
+                relay_join_req_limit_bucket_size=response.device_profile.relay_join_req_limit_bucket_size,
+                relay_notify_limit_bucket_size=response.device_profile.relay_notify_limit_bucket_size,
+                relay_global_uplink_limit_bucket_size=response.device_profile.relay_global_uplink_limit_bucket_size,
+                relay_overall_limit_bucket_size=response.device_profile.relay_overall_limit_bucket_size,
+                measurements=dict(response.device_profile.measurements) if hasattr(response.device_profile, 'measurements') else {}
+            )
+            return device_profile
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_device_profile(): Device Profile {device_profile_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def get_device_app_key(self, deveui: api.Device | str, lw_v: MacVersion | int) -> str:
         """
@@ -348,7 +467,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code} - {details}")
             return {}
 
-    def get_gateway(self, gateway_id: api.Gateway | str) -> api.GetGatewayResponse | dict:
+    def get_gateway(self, gateway_id: api.Gateway | str) -> Gateway | None:
         """
         Get gateway.
 
@@ -356,10 +475,42 @@ class ChirpstackClient:
         ----------
         - gateway_id (EUI64): Unique identifier for the gateway.
             Passing in a Gateway object will also work.
+
+        Returns
+        -------
+        - Gateway object or None if not found.
         """
         try:
-            return self._call_rpc("GatewayService", "Get",
-                                 "GetGatewayRequest", {"gateway_id": str(gateway_id)})
+            response = self._call_rpc("GatewayService", "Get",
+                                     "GetGatewayRequest", {"gateway_id": str(gateway_id)})
+            
+            if not response or not hasattr(response, 'gateway'):
+                return None
+            
+            # Create Location object if location data exists
+            location = None
+            if hasattr(response.gateway, 'location') and response.gateway.location:
+                location = Location(
+                    latitude=response.gateway.location.latitude,
+                    longitude=response.gateway.location.longitude,
+                    altitude=getattr(response.gateway.location, 'altitude', 0.0),
+                    source=getattr(response.gateway.location, 'source', 'UNKNOWN'),
+                    accuracy=getattr(response.gateway.location, 'accuracy', 0.0)
+                )
+            
+            gateway = Gateway(
+                name=response.gateway.name,
+                gateway_id=response.gateway.gateway_id,
+                tenant_id=response.gateway.tenant_id,
+                description=response.gateway.description,
+                tags=dict(response.gateway.tags),
+                stats_interval=response.gateway.stats_interval,
+                id=response.gateway.id,
+                location=location,
+                metadata=dict(response.gateway.metadata) if hasattr(response.gateway, 'metadata') else {}
+            )
+            return gateway
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
 
@@ -369,7 +520,7 @@ class ChirpstackClient:
                 return self.refresh_token(e, self._get_gateway, gateway_id)
             else:
                 logging.error(f"ChirpstackClient.get_gateway(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
     
     def create_app(self,app:Application) -> None:
         """
@@ -672,24 +823,40 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_http_integration(self, app_id: str) -> api.GetHttpIntegrationResponse | dict:
+    def get_http_integration(self, app_id: str) -> HttpIntegration | None:
         """
         Get HTTP integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - HttpIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetHttpIntegration",
-                                 "GetHttpIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetHttpIntegration",
+                                     "GetHttpIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            integration = HttpIntegration(
+                application_id=response.integration.application_id,
+                headers=dict(response.integration.headers),
+                url=response.integration.url,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_http_integration(): HTTP integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_http_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_http_integration(self, integration: HttpIntegration) -> None:
         """
@@ -748,24 +915,51 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_influxdb_integration(self, app_id: str) -> api.GetInfluxDbIntegrationResponse | dict:
+    def get_influxdb_integration(self, app_id: str) -> InfluxDbIntegration | None:
         """
         Get InfluxDB integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - InfluxDbIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetInfluxDbIntegration",
-                                 "GetInfluxDbIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetInfluxDbIntegration",
+                                     "GetInfluxDbIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            # Import the enums here to avoid circular imports
+            from chirpstack_api_wrapper.objects import InfluxDbVersion, InfluxDbPrecision
+            
+            # Find the enum values by comparing the response values
+            version_enum = next((v for v in InfluxDbVersion if v.value == response.integration.version), InfluxDbVersion.INFLUXDB_1)
+            precision_enum = next((p for p in InfluxDbPrecision if p.value == response.integration.precision), InfluxDbPrecision.S)
+            
+            integration = InfluxDbIntegration(
+                application_id=response.integration.application_id,
+                endpoint=response.integration.endpoint,
+                token=response.integration.token,
+                organization=response.integration.organization,
+                bucket=response.integration.bucket,
+                version=version_enum,
+                precision=precision_enum,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_influxdb_integration(): InfluxDB integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_influxdb_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_influxdb_integration(self, integration: InfluxDbIntegration) -> None:
         """
@@ -824,24 +1018,40 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_thingsboard_integration(self, app_id: str) -> api.GetThingsBoardIntegrationResponse | dict:
+    def get_thingsboard_integration(self, app_id: str) -> ThingsBoardIntegration | None:
         """
         Get ThingsBoard integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - ThingsBoardIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetThingsBoardIntegration",
-                                 "GetThingsBoardIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetThingsBoardIntegration",
+                                     "GetThingsBoardIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            integration = ThingsBoardIntegration(
+                application_id=response.integration.application_id,
+                server=response.integration.server,
+                token=response.integration.token,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_thingsboard_integration(): ThingsBoard integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_thingsboard_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_thingsboard_integration(self, integration: ThingsBoardIntegration) -> None:
         """
@@ -898,24 +1108,42 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_aws_sns_integration(self, app_id: str) -> api.GetAwsSnsIntegrationResponse | dict:
+    def get_aws_sns_integration(self, app_id: str) -> AwsSnsIntegration | None:
         """
         Get AWS SNS integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - AwsSnsIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetAwsSnsIntegration",
-                                 "GetAwsSnsIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetAwsSnsIntegration",
+                                     "GetAwsSnsIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            integration = AwsSnsIntegration(
+                application_id=response.integration.application_id,
+                aws_region=response.integration.aws_region,
+                aws_access_key_id=response.integration.aws_access_key_id,
+                aws_secret_access_key=response.integration.aws_secret_access_key,
+                topic_arn=response.integration.topic_arn,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_aws_sns_integration(): AWS SNS integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_aws_sns_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_aws_sns_integration(self, integration: AwsSnsIntegration) -> None:
         """
@@ -972,24 +1200,40 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_azure_service_bus_integration(self, app_id: str) -> api.GetAzureServiceBusIntegrationResponse | dict:
+    def get_azure_service_bus_integration(self, app_id: str) -> AzureServiceBusIntegration | None:
         """
         Get Azure Service Bus integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - AzureServiceBusIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetAzureServiceBusIntegration",
-                                 "GetAzureServiceBusIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetAzureServiceBusIntegration",
+                                     "GetAzureServiceBusIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            integration = AzureServiceBusIntegration(
+                application_id=response.integration.application_id,
+                connection_string=response.integration.connection_string,
+                topic_name=response.integration.topic_name,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_azure_service_bus_integration(): Azure Service Bus integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_azure_service_bus_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_azure_service_bus_integration(self, integration: AzureServiceBusIntegration) -> None:
         """
@@ -1046,24 +1290,48 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_gcp_pubsub_integration(self, app_id: str) -> api.GetGcpPubSubIntegrationResponse | dict:
+    def get_gcp_pubsub_integration(self, app_id: str) -> GcpPubSubIntegration | None:
         """
         Get GCP Pub/Sub integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - GcpPubSubIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetGcpPubSubIntegration",
-                                 "GetGcpPubSubIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetGcpPubSubIntegration",
+                                     "GetGcpPubSubIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            # Import the enum here to avoid circular imports
+            from chirpstack_api_wrapper.objects import Encoding
+            
+            # Find the enum value by comparing the response value
+            encoding_enum = next((e for e in Encoding if e.value == response.integration.encoding), Encoding.JSON)
+            
+            integration = GcpPubSubIntegration(
+                application_id=response.integration.application_id,
+                encoding=encoding_enum,
+                project_id=response.integration.project_id,
+                topic_name=response.integration.topic_name,
+                service_account_key=response.integration.service_account_key,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_gcp_pubsub_integration(): GCP Pub/Sub integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_gcp_pubsub_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_gcp_pubsub_integration(self, integration: GcpPubSubIntegration) -> None:
         """
@@ -1119,24 +1387,39 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_ifttt_integration(self, app_id: str) -> api.GetIftttIntegrationResponse | dict:
+    def get_ifttt_integration(self, app_id: str) -> IftttIntegration | None:
         """
         Get IFTTT integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - IftttIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetIftttIntegration",
-                                 "GetIftttIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetIftttIntegration",
+                                     "GetIftttIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            integration = IftttIntegration(
+                application_id=response.integration.application_id,
+                key=response.integration.key,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_ifttt_integration(): IFTTT integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_ifttt_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_ifttt_integration(self, integration: IftttIntegration) -> None:
         """
@@ -1190,24 +1473,40 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_mydevices_integration(self, app_id: str) -> api.GetMyDevicesIntegrationResponse | dict:
+    def get_mydevices_integration(self, app_id: str) -> MyDevicesIntegration | None:
         """
         Get MyDevices integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - MyDevicesIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetMyDevicesIntegration",
-                                 "GetMyDevicesIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetMyDevicesIntegration",
+                                     "GetMyDevicesIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            integration = MyDevicesIntegration(
+                application_id=response.integration.application_id,
+                endpoint=response.integration.endpoint,
+                token=response.integration.token,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_mydevices_integration(): MyDevices integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_mydevices_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_mydevices_integration(self, integration: MyDevicesIntegration) -> None:
         """
@@ -1262,24 +1561,40 @@ class ChirpstackClient:
         integration.id = resp.id
         return
 
-    def get_pilot_things_integration(self, app_id: str) -> api.GetPilotThingsIntegrationResponse | dict:
+    def get_pilot_things_integration(self, app_id: str) -> PilotThingsIntegration | None:
         """
         Get Pilot Things integration for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - PilotThingsIntegration object or None if not found.
         """
         try:
-            return self._call_rpc("ApplicationService", "GetPilotThingsIntegration",
-                                 "GetPilotThingsIntegrationRequest", {"application_id": app_id})
+            response = self._call_rpc("ApplicationService", "GetPilotThingsIntegration",
+                                     "GetPilotThingsIntegrationRequest", {"application_id": app_id})
+            
+            if not response or not hasattr(response, 'integration'):
+                return None
+            
+            integration = PilotThingsIntegration(
+                application_id=response.integration.application_id,
+                server=response.integration.server,
+                token=response.integration.token,
+                id=response.integration.id
+            )
+            return integration
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_pilot_things_integration(): Pilot Things integration for app {app_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_pilot_things_integration(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_pilot_things_integration(self, integration: PilotThingsIntegration) -> None:
         """
@@ -1628,17 +1943,32 @@ class ChirpstackClient:
         return self._call_rpc("GatewayService", "GenerateClientCertificate",
                              "GenerateGatewayClientCertificateRequest", {"gateway_id": str(gateway_id)})
 
-    def get_relay_gateway(self, gateway_id: api.Gateway | str) -> api.GetRelayGatewayResponse | dict:
+    def get_relay_gateway(self, gateway_id: api.Gateway | str) -> dict:
         """
         Get relay gateway.
 
         Parameters
         ----------
         - gateway_id: Gateway ID.
+
+        Returns
+        -------
+        - Dictionary with relay gateway data or empty dict if not found.
         """
         try:
-            return self._call_rpc("GatewayService", "GetRelayGateway",
-                                 "GetRelayGatewayRequest", {"gateway_id": str(gateway_id)})
+            response = self._call_rpc("GatewayService", "GetRelayGateway",
+                                     "GetRelayGatewayRequest", {"gateway_id": str(gateway_id)})
+            
+            if not response or not hasattr(response, 'relay_gateway'):
+                return {}
+            
+            # Return relay gateway data as dictionary since there's no specific object for it
+            relay_data = {
+                "gateway_id": response.relay_gateway.gateway_id,
+                "relay": response.relay_gateway.relay
+            }
+            return relay_data
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
@@ -1801,24 +2131,40 @@ class ChirpstackClient:
                                  }
                              })
 
-    def get_tenant(self, tenant_id: api.Tenant | str) -> api.GetTenantResponse | dict:
+    def get_tenant(self, tenant_id: api.Tenant | str) -> Tenant | None:
         """
         Get tenant.
 
         Parameters
         ----------
         - tenant_id: Tenant ID.
+
+        Returns
+        -------
+        - Tenant object or None if not found.
         """
         try:
-            return self._call_rpc("TenantService", "Get",
-                                 "GetTenantRequest", {"id": str(tenant_id)})
+            response = self._call_rpc("TenantService", "Get",
+                                     "GetTenantRequest", {"id": str(tenant_id)})
+            
+            if not response or not hasattr(response, 'tenant'):
+                return None
+            
+            tenant = Tenant(
+                name=response.tenant.name,
+                description=response.tenant.description,
+                id=response.tenant.id,
+                tags=dict(response.tenant.tags)
+            )
+            return tenant
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_tenant(): Tenant {tenant_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_tenant(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def delete_tenant(self, tenant_id: api.Tenant | str) -> None:
         """
@@ -1881,7 +2227,7 @@ class ChirpstackClient:
                                  "tenant_id": tenant_id
                              })
 
-    def get_user(self, user_id: str, tenant_id: str) -> api.GetTenantUserResponse | dict:
+    def get_user(self, user_id: str, tenant_id: str) -> User | None:
         """
         Get user.
 
@@ -1889,20 +2235,38 @@ class ChirpstackClient:
         ----------
         - user_id: User ID.
         - tenant_id: Tenant ID.
+
+        Returns
+        -------
+        - User object or None if not found.
         """
         try:
-            return self._call_rpc("TenantService", "GetUser",
-                                 "GetTenantUserRequest", {
-                                     "user_id": user_id,
-                                     "tenant_id": tenant_id
-                                 })
+            response = self._call_rpc("TenantService", "GetUser",
+                                     "GetTenantUserRequest", {
+                                         "user_id": user_id,
+                                         "tenant_id": tenant_id
+                                     })
+            
+            if not response or not hasattr(response, 'user'):
+                return None
+            
+            user = User(
+                email=response.user.email,
+                password="",  # Password is not returned by the API
+                is_active=response.user.is_active,
+                is_admin=response.user.is_admin,
+                note=response.user.note,
+                id=response.user.id
+            )
+            return user
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_user(): User {user_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_user(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def delete_user(self, user_id: str, tenant_id: str) -> None:
         """
@@ -1978,24 +2342,42 @@ class ChirpstackClient:
                                  }
                              })
 
-    def get_user_standalone(self, user_id: str) -> api.GetUserResponse | dict:
+    def get_user_standalone(self, user_id: str) -> User | None:
         """
         Get user (standalone, not tied to a tenant).
 
         Parameters
         ----------
         - user_id: User ID.
+
+        Returns
+        -------
+        - User object or None if not found.
         """
         try:
-            return self._call_rpc("UserService", "Get",
-                                 "GetUserRequest", {"id": user_id})
+            response = self._call_rpc("UserService", "Get",
+                                     "GetUserRequest", {"id": user_id})
+            
+            if not response or not hasattr(response, 'user'):
+                return None
+            
+            user = User(
+                email=response.user.email,
+                password="",  # Password is not returned by the API
+                is_active=response.user.is_active,
+                is_admin=response.user.is_admin,
+                note=response.user.note,
+                id=response.user.id
+            )
+            return user
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_user_standalone(): User {user_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_user_standalone(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def delete_user_standalone(self, user_id: str) -> None:
         """
@@ -2058,24 +2440,53 @@ class ChirpstackClient:
         multicast_group.id = resp.id
         return
 
-    def get_multicast_group(self, multicast_group_id: str) -> api.GetMulticastGroupResponse | dict:
+    def get_multicast_group(self, multicast_group_id: str) -> MulticastGroup | None:
         """
         Get multicast group.
 
         Parameters
         ----------
         - multicast_group_id: Multicast group ID.
+
+        Returns
+        -------
+        - MulticastGroup object or None if not found.
         """
         try:
-            return self._call_rpc("MulticastGroupService", "Get",
-                                 "GetMulticastGroupRequest", {"id": multicast_group_id})
+            response = self._call_rpc("MulticastGroupService", "Get",
+                                     "GetMulticastGroupRequest", {"id": multicast_group_id})
+            
+            if not response or not hasattr(response, 'multicast_group'):
+                return None
+            
+            # Import the enum here to avoid circular imports
+            from chirpstack_api_wrapper.objects import MulticastGroupType
+            
+            # Find the enum value by comparing the response value
+            group_type_enum = next((g for g in MulticastGroupType if g.value == response.multicast_group.group_type), MulticastGroupType.CLASS_C)
+            
+            multicast_group = MulticastGroup(
+                name=response.multicast_group.name,
+                mc_addr=response.multicast_group.mc_addr,
+                mc_nwk_s_key=response.multicast_group.mc_nwk_s_key,
+                mc_app_s_key=response.multicast_group.mc_app_s_key,
+                f_cnt=response.multicast_group.f_cnt,
+                group_type=group_type_enum,
+                mc_timeout=response.multicast_group.mc_timeout,
+                application_id=response.multicast_group.application_id,
+                id=response.multicast_group.id,
+                description=response.multicast_group.description,
+                tags=dict(response.multicast_group.tags)
+            )
+            return multicast_group
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_multicast_group(): Multicast group {multicast_group_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_multicast_group(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_multicast_group(self, multicast_group: MulticastGroup) -> None:
         """
@@ -2268,24 +2679,59 @@ class ChirpstackClient:
         fuota_deployment.id = resp.id
         return
 
-    def get_fuota_deployment(self, deployment_id: str) -> api.GetFuotaDeploymentResponse | dict:
+    def get_fuota_deployment(self, deployment_id: str) -> FuotaDeployment | None:
         """
         Get FUOTA deployment.
 
         Parameters
         ----------
         - deployment_id: Deployment ID.
+
+        Returns
+        -------
+        - FuotaDeployment object or None if not found.
         """
         try:
-            return self._call_rpc("FuotaService", "GetDeployment",
-                                 "GetFuotaDeploymentRequest", {"id": deployment_id})
+            response = self._call_rpc("FuotaService", "GetDeployment",
+                                     "GetFuotaDeploymentRequest", {"id": deployment_id})
+            
+            if not response or not hasattr(response, 'deployment'):
+                return None
+            
+            # Import the enum here to avoid circular imports
+            from chirpstack_api_wrapper.objects import MulticastGroupType
+            
+            # Find the enum values by comparing the response values
+            multicast_group_type_enum = next((m for m in MulticastGroupType if m.value == response.deployment.multicast_group_type), MulticastGroupType.CLASS_C)
+            group_type_enum = next((g for g in MulticastGroupType if g.value == response.deployment.group_type), MulticastGroupType.CLASS_C)
+            
+            fuota_deployment = FuotaDeployment(
+                name=response.deployment.name,
+                application_id=response.deployment.application_id,
+                device_profile_id=response.deployment.device_profile_id,
+                multicast_group_id=response.deployment.multicast_group_id,
+                multicast_group_type=multicast_group_type_enum,
+                mc_addr=response.deployment.mc_addr,
+                mc_nwk_s_key=response.deployment.mc_nwk_s_key,
+                mc_app_s_key=response.deployment.mc_app_s_key,
+                f_cnt=response.deployment.f_cnt,
+                group_type=group_type_enum,
+                dr=response.deployment.dr,
+                frequency=response.deployment.frequency,
+                class_c_timeout=response.deployment.class_c_timeout,
+                id=response.deployment.id,
+                description=response.deployment.description,
+                tags=dict(response.deployment.tags)
+            )
+            return fuota_deployment
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_fuota_deployment(): Deployment {deployment_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_fuota_deployment(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_fuota_deployment(self, fuota_deployment: FuotaDeployment) -> None:
         """
@@ -2487,24 +2933,60 @@ class ChirpstackClient:
         template.id = resp.id
         return
 
-    def get_device_profile_template(self, template_id: str) -> api.GetDeviceProfileTemplateResponse | dict:
+    def get_device_profile_template(self, template_id: str) -> DeviceProfileTemplate | None:
         """
         Get device profile template.
 
         Parameters
         ----------
         - template_id: Template ID.
+
+        Returns
+        -------
+        - DeviceProfileTemplate object or None if not found.
         """
         try:
-            return self._call_rpc("DeviceProfileTemplateService", "Get",
-                                 "GetDeviceProfileTemplateRequest", {"id": template_id})
+            response = self._call_rpc("DeviceProfileTemplateService", "Get",
+                                     "GetDeviceProfileTemplateRequest", {"id": template_id})
+            
+            if not response or not hasattr(response, 'device_profile_template'):
+                return None
+            
+            # Import the enums here to avoid circular imports
+            from chirpstack_api_wrapper.objects import Region, MacVersion, RegParamsRevision, CodecRuntime
+            
+            # Find the enum values by comparing the response values
+            region_enum = next((r for r in Region if r.value == response.device_profile_template.region), Region.EU868)
+            mac_version_enum = next((m for m in MacVersion if m.value == response.device_profile_template.mac_version), MacVersion.LORAWAN_1_0_0)
+            reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == response.device_profile_template.reg_params_revision), RegParamsRevision.A)
+            payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == response.device_profile_template.payload_codec_runtime), CodecRuntime.NONE)
+            
+            template = DeviceProfileTemplate(
+                name=response.device_profile_template.name,
+                vendor=response.device_profile_template.vendor,
+                firmware=response.device_profile_template.firmware,
+                region=region_enum,
+                mac_version=mac_version_enum,
+                reg_params_revision=reg_params_revision_enum,
+                adr_algorithm_id=response.device_profile_template.adr_algorithm_id,
+                payload_codec_runtime=payload_codec_runtime_enum,
+                uplink_interval=response.device_profile_template.uplink_interval,
+                supports_otaa=response.device_profile_template.supports_otaa,
+                supports_class_b=response.device_profile_template.supports_class_b,
+                supports_class_c=response.device_profile_template.supports_class_c,
+                id=response.device_profile_template.id,
+                description=response.device_profile_template.description,
+                tags=dict(response.device_profile_template.tags)
+            )
+            return template
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_device_profile_template(): Template {template_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_device_profile_template(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_device_profile_template(self, template: DeviceProfileTemplate) -> None:
         """
@@ -2579,24 +3061,42 @@ class ChirpstackClient:
         relay.id = resp.id
         return
 
-    def get_relay(self, relay_id: str) -> api.GetRelayResponse | dict:
+    def get_relay(self, relay_id: str) -> Relay | None:
         """
         Get relay.
 
         Parameters
         ----------
         - relay_id: Relay ID.
+
+        Returns
+        -------
+        - Relay object or None if not found.
         """
         try:
-            return self._call_rpc("RelayService", "Get",
-                                 "GetRelayRequest", {"id": relay_id})
+            response = self._call_rpc("RelayService", "Get",
+                                     "GetRelayRequest", {"id": relay_id})
+            
+            if not response or not hasattr(response, 'relay'):
+                return None
+            
+            relay = Relay(
+                name=response.relay.name,
+                tenant_id=response.relay.tenant_id,
+                device_id=response.relay.device_id,
+                id=response.relay.id,
+                description=response.relay.description,
+                tags=dict(response.relay.tags)
+            )
+            return relay
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_relay(): Relay {relay_id} not found - {details}")
             else:
                 logging.error(f"ChirpstackClient.get_relay(): An error occurred with status code {status_code} - {details}")
-            return {}
+            return None
 
     def update_relay(self, relay: Relay) -> None:
         """

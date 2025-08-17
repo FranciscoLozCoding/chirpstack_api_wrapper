@@ -203,6 +203,17 @@ class User:
 
     def __str__(self):
         return self.email
+    
+    def to_dict(self) -> dict:
+        """Convert User object to dictionary."""
+        return {
+            'id': self.id,
+            'email': self.email,
+            'password': self.password,
+            'is_active': self.is_active,
+            'is_admin': self.is_admin,
+            'note': self.note
+        }
 
 class Tenant:
     """
@@ -227,6 +238,15 @@ class Tenant:
         if self.id == "":
             raise RuntimeError("Tenant: The id is empty, try creating the tenant first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert Tenant object to dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'tags': self.tags
+        }
 
 class MulticastGroup:
     """
@@ -267,6 +287,22 @@ class MulticastGroup:
         if self.id == "":
             raise RuntimeError("MulticastGroup: The id is empty, try creating the group first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert MulticastGroup object to dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'mc_addr': self.mc_addr,
+            'mc_nwk_s_key': self.mc_nwk_s_key,
+            'mc_app_s_key': self.mc_app_s_key,
+            'f_cnt': self.f_cnt,
+            'group_type': self.group_type,
+            'mc_timeout': self.mc_timeout,
+            'application_id': self.application_id,
+            'description': self.description,
+            'tags': self.tags
+        }
 
 class FuotaDeployment:
     """
@@ -318,6 +354,27 @@ class FuotaDeployment:
         if self.id == "":
             raise RuntimeError("FuotaDeployment: The id is empty, try creating the deployment first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert FuotaDeployment object to dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'application_id': self.application_id,
+            'device_profile_id': self.device_profile_id,
+            'multicast_group_id': self.multicast_group_id,
+            'multicast_group_type': self.multicast_group_type,
+            'mc_addr': self.mc_addr,
+            'mc_nwk_s_key': self.mc_nwk_s_key,
+            'mc_app_s_key': self.mc_app_s_key,
+            'f_cnt': self.f_cnt,
+            'group_type': self.group_type,
+            'dr': self.dr,
+            'frequency': self.frequency,
+            'class_c_timeout': self.class_c_timeout,
+            'description': self.description,
+            'tags': self.tags
+        }
 
 class DeviceProfileTemplate:
     """
@@ -367,6 +424,26 @@ class DeviceProfileTemplate:
         if self.id == "":
             raise RuntimeError("DeviceProfileTemplate: The id is empty, try creating the template first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert DeviceProfileTemplate object to dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'vendor': self.vendor,
+            'firmware': self.firmware,
+            'region': self.region,
+            'mac_version': self.mac_version,
+            'reg_params_revision': self.reg_params_revision,
+            'adr_algorithm_id': self.adr_algorithm_id,
+            'payload_codec_runtime': self.payload_codec_runtime,
+            'uplink_interval': self.uplink_interval,
+            'supports_otaa': self.supports_otaa,
+            'supports_class_b': self.supports_class_b,
+            'supports_class_c': self.supports_class_c,
+            'description': self.description,
+            'tags': self.tags
+        }
 
 class Relay:
     """
@@ -395,6 +472,17 @@ class Relay:
         if self.id == "":
             raise RuntimeError("Relay: The id is empty, try creating the relay first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert Relay object to dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'tenant_id': self.tenant_id,
+            'device_id': self.device_id,
+            'description': self.description,
+            'tags': self.tags
+        }
 
 # Integration objects
 class HttpIntegration:
@@ -417,6 +505,15 @@ class HttpIntegration:
         if self.id == "":
             raise RuntimeError("HttpIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert HttpIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'headers': self.headers,
+            'url': self.url
+        }
 
 class InfluxDbIntegration:
     """
@@ -447,6 +544,19 @@ class InfluxDbIntegration:
         if self.id == "":
             raise RuntimeError("InfluxDbIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert InfluxDbIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'endpoint': self.endpoint,
+            'token': self.token,
+            'organization': self.organization,
+            'bucket': self.bucket,
+            'version': self.version,
+            'precision': self.precision
+        }
 
 class ThingsBoardIntegration:
     """
@@ -468,6 +578,15 @@ class ThingsBoardIntegration:
         if self.id == "":
             raise RuntimeError("ThingsBoardIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert ThingsBoardIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'server': self.server,
+            'token': self.token
+        }
 
 class AwsSnsIntegration:
     """
@@ -494,6 +613,17 @@ class AwsSnsIntegration:
         if self.id == "":
             raise RuntimeError("AwsSnsIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert AwsSnsIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'aws_region': self.aws_region,
+            'aws_access_key_id': self.aws_access_key_id,
+            'aws_secret_access_key': self.aws_secret_access_key,
+            'topic_arn': self.topic_arn
+        }
 
 class AzureServiceBusIntegration:
     """
@@ -515,6 +645,15 @@ class AzureServiceBusIntegration:
         if self.id == "":
             raise RuntimeError("AzureServiceBusIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert AzureServiceBusIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'connection_string': self.connection_string,
+            'topic_name': self.topic_name
+        }
 
 class GcpPubSubIntegration:
     """
@@ -541,6 +680,17 @@ class GcpPubSubIntegration:
         if self.id == "":
             raise RuntimeError("GcpPubSubIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert GcpPubSubIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'encoding': self.encoding,
+            'project_id': self.project_id,
+            'topic_name': self.topic_name,
+            'service_account_key': self.service_account_key
+        }
 
 class IftttIntegration:
     """
@@ -560,6 +710,14 @@ class IftttIntegration:
         if self.id == "":
             raise RuntimeError("IftttIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert IftttIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'key': self.key
+        }
 
 class MyDevicesIntegration:
     """
@@ -581,6 +739,15 @@ class MyDevicesIntegration:
         if self.id == "":
             raise RuntimeError("MyDevicesIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert MyDevicesIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'endpoint': self.endpoint,
+            'token': self.token
+        }
 
 class PilotThingsIntegration:
     """
@@ -602,6 +769,15 @@ class PilotThingsIntegration:
         if self.id == "":
             raise RuntimeError("PilotThingsIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert PilotThingsIntegration object to dictionary."""
+        return {
+            'id': self.id,
+            'application_id': self.application_id,
+            'server': self.server,
+            'token': self.token
+        }
 
 class Location:
     """
@@ -623,6 +799,16 @@ class Location:
 
     def __str__(self):
         return f"({self.latitude}, {self.longitude}, {self.altitude}m)"
+    
+    def to_dict(self) -> dict:
+        """Convert Location object to dictionary."""
+        return {
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'altitude': self.altitude,
+            'source': self.source,
+            'accuracy': self.accuracy
+        }
 
 class Gateway:
     """
@@ -666,6 +852,20 @@ class Gateway:
     def __str__(self):
         """String representation of the Gateway object"""
         return self.gateway_id
+    
+    def to_dict(self) -> dict:
+        """Convert Gateway object to dictionary."""
+        return {
+            'id': self.id,
+            'gateway_id': self.gateway_id,
+            'name': self.name,
+            'description': self.description,
+            'tenant_id': self.tenant_id,
+            'tags': self.tags,
+            'stats_interval': self.stats_interval,
+            'location': self.location.to_dict() if isinstance(self.location, Location) else self.location,
+            'metadata': self.metadata
+        }
 
 class Application:
     """
@@ -696,6 +896,16 @@ class Application:
         if self.id == "":
             raise RuntimeError("Application: The id is empty, try creating the app first in Chirpstack using ChirpstackClient.create_app()")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert Application object to dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'tenant_id': self.tenant_id,
+            'description': self.description,
+            'tags': self.tags
+        }
 
 class DeviceProfile:
     """
@@ -949,6 +1159,65 @@ class DeviceProfile:
         if self.id == "":
             raise RuntimeError("DeviceProfile: The id is empty, try creating the profile first in Chirpstack using ChirpstackClient.create_device_profile()")
         return self.id
+    
+    def to_dict(self) -> dict:
+        """Convert DeviceProfile object to dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'tenant_id': self.tenant_id,
+            'region': self.region,
+            'mac_version': self.mac_version,
+            'reg_params_revision': self.reg_params_revision,
+            'uplink_interval': self.uplink_interval,
+            'supports_otaa': self.supports_otaa,
+            'abp_rx1_delay': self.abp_rx1_delay,
+            'abp_rx1_dr_offset': self.abp_rx1_dr_offset,
+            'abp_rx2_dr': self.abp_rx2_dr,
+            'abp_rx2_freq': self.abp_rx2_freq,
+            'supports_class_b': self.supports_class_b,
+            'class_b_timeout': self.class_b_timeout,
+            'class_b_ping_slot_nb_k': self.class_b_ping_slot_nb_k,
+            'class_b_ping_slot_dr': self.class_b_ping_slot_dr,
+            'class_b_ping_slot_freq': self.class_b_ping_slot_freq,
+            'supports_class_c': self.supports_class_c,
+            'class_c_timeout': self.class_c_timeout,
+            'description': self.description,
+            'payload_codec_runtime': self.payload_codec_runtime,
+            'payload_codec_script': self.payload_codec_script,
+            'flush_queue_on_activate': self.flush_queue_on_activate,
+            'device_status_req_interval': self.device_status_req_interval,
+            'tags': self.tags,
+            'auto_detect_measurements': self.auto_detect_measurements,
+            'allow_roaming': self.allow_roaming,
+            'adr_algorithm_id': self.adr_algorithm_id,
+            'rx1_delay': self.rx1_delay,
+            'app_layer_params': self.app_layer_params,
+            'region_config_id': self.region_config_id,
+            'is_relay': self.is_relay,
+            'is_relay_ed': self.is_relay_ed,
+            'relay_ed_relay_only': self.relay_ed_relay_only,
+            'relay_enabled': self.relay_enabled,
+            'relay_cad_periodicity': self.relay_cad_periodicity,
+            'relay_default_channel_index': self.relay_default_channel_index,
+            'relay_second_channel_freq': self.relay_second_channel_freq,
+            'relay_second_channel_dr': self.relay_second_channel_dr,
+            'relay_second_channel_ack_offset': self.relay_second_channel_ack_offset,
+            'relay_ed_activation_mode': self.relay_ed_activation_mode,
+            'relay_ed_smart_enable_level': self.relay_ed_smart_enable_level,
+            'relay_ed_back_off': self.relay_ed_back_off,
+            'relay_ed_uplink_limit_bucket_size': self.relay_ed_uplink_limit_bucket_size,
+            'relay_ed_uplink_limit_reload_rate': self.relay_ed_uplink_limit_reload_rate,
+            'relay_join_req_limit_reload_rate': self.relay_join_req_limit_reload_rate,
+            'relay_notify_limit_reload_rate': self.relay_notify_limit_reload_rate,
+            'relay_global_uplink_limit_reload_rate': self.relay_global_uplink_limit_reload_rate,
+            'relay_overall_limit_reload_rate': self.relay_overall_limit_reload_rate,
+            'relay_join_req_limit_bucket_size': self.relay_join_req_limit_bucket_size,
+            'relay_notify_limit_bucket_size': self.relay_notify_limit_bucket_size,
+            'relay_global_uplink_limit_bucket_size': self.relay_global_uplink_limit_bucket_size,
+            'relay_overall_limit_bucket_size': self.relay_overall_limit_bucket_size,
+            'measurements': self.measurements
+        }
 
 class Device:
     """
@@ -995,6 +1264,21 @@ class Device:
     def __str__(self):
         """String representation of the Device object"""
         return self.dev_eui
+    
+    def to_dict(self) -> dict:
+        """Convert Device object to dictionary."""
+        return {
+            'name': self.name,
+            'dev_eui': self.dev_eui,
+            'application_id': self.application_id,
+            'device_profile_id': self.device_profile_id,
+            'join_eui': self.join_eui,
+            'description': self.description,
+            'skip_fcnt_check': self.skip_fcnt_check,
+            'is_disabled': self.is_disabled,
+            'tags': self.tags,
+            'variables': self.variables
+        }
 
 class DeviceKeys:
     """
@@ -1012,3 +1296,11 @@ class DeviceKeys:
         self.dev_eui = str(dev_eui)
         self.nwk_key = nwk_key
         self.app_key = app_key
+    
+    def to_dict(self) -> dict:
+        """Convert DeviceKeys object to dictionary."""
+        return {
+            'dev_eui': self.dev_eui,
+            'nwk_key': self.nwk_key,
+            'app_key': self.app_key
+        }

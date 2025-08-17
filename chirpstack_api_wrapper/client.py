@@ -240,7 +240,7 @@ class ChirpstackClient:
         """
         return self._list_with_pagination("TenantService", {}, "ListTenantsRequest")
 
-    def get_app(self, app_id: api.Application | str) -> Application | None:
+    def get_app(self, app_id: Application | str) -> Application | None:
         """
         Get application.
 
@@ -277,7 +277,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_app(): An error occurred with status code {status_code} - {details}")
             return None
 
-    def get_device(self, dev_eui: api.Device | str) -> Device | None:
+    def get_device(self, dev_eui: Device | str) -> Device | None:
         """
         Get device.
 
@@ -319,7 +319,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_device(): An error occurred with status code {status_code} - {details}")
             return None
         
-    def get_device_profile(self, device_profile_id: api.DeviceProfile | str) -> DeviceProfile | None:
+    def get_device_profile(self, device_profile_id: DeviceProfile | str) -> DeviceProfile | None:
         """
         Get device profile.
 
@@ -419,7 +419,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code} - {details}")
             return None
 
-    def get_device_app_key(self, deveui: api.Device | str, lw_v: MacVersion | int) -> str:
+    def get_device_app_key(self, deveui: Device | str, lw_v: MacVersion | int) -> str:
         """
         Get device Application key (Only OTAA).
 
@@ -447,7 +447,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_device_app_key(): An error occurred with status code {status_code} - {details}")
             return ""
 
-    def get_device_activation(self, deveui: api.Device | str) -> api.GetDeviceActivationResponse | dict:
+    def get_device_activation(self, deveui: Device | str) -> dict:
         """
         Get Activation returns the current activation details of the device (OTAA or ABP).
 
@@ -467,7 +467,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code} - {details}")
             return {}
 
-    def get_gateway(self, gateway_id: api.Gateway | str) -> Gateway | None:
+    def get_gateway(self, gateway_id: Gateway | str) -> Gateway | None:
         """
         Get gateway.
 
@@ -692,7 +692,7 @@ class ChirpstackClient:
         gateway.id = resp.id #attach chirp generated uuid to gateway object
         return
 
-    def delete_app(self, app_id: api.Application | str) -> None:
+    def delete_app(self, app_id: Application | str) -> None:
         """
         Delete an Application.
 
@@ -704,7 +704,7 @@ class ChirpstackClient:
         return self._call_rpc("ApplicationService", "Delete",
                              "DeleteApplicationRequest", {"id": str(app_id)})
 
-    def delete_device(self, dev_eui: api.Device | str) -> None:
+    def delete_device(self, dev_eui: Device | str) -> None:
         """
         Delete a Device.
 
@@ -716,7 +716,7 @@ class ChirpstackClient:
         return self._call_rpc("DeviceService", "Delete",
                              "DeleteDeviceRequest", {"dev_eui": str(dev_eui)})
 
-    def delete_device_profile(self, device_profile_id: api.DeviceProfile | str) -> None:
+    def delete_device_profile(self, device_profile_id: DeviceProfile | str) -> None:
         """
         Delete a Device Profile.
 
@@ -728,7 +728,7 @@ class ChirpstackClient:
         return self._call_rpc("DeviceProfileService", "Delete",
                              "DeleteDeviceProfileRequest", {"id": str(device_profile_id)})
 
-    def delete_gateway(self, gateway_id: api.Gateway | str) -> None:
+    def delete_gateway(self, gateway_id: Gateway | str) -> None:
         """
         Delete a Gateway.
 
@@ -762,7 +762,7 @@ class ChirpstackClient:
                                  }
                              })
 
-    def list_device_profiles_for_app(self, app_id: api.Application | str) -> list:
+    def list_device_profiles_for_app(self, app_id: Application | str) -> list:
         """
         List device profiles for an application.
 
@@ -775,7 +775,7 @@ class ChirpstackClient:
                                         "ListDeviceProfilesRequest", 
                                         "result")
 
-    def list_device_tags_for_app(self, app_id: api.Application | str) -> list:
+    def list_device_tags_for_app(self, app_id: Application | str) -> list:
         """
         List device tags for an application.
 
@@ -788,7 +788,7 @@ class ChirpstackClient:
                                         "ListDeviceTagsRequest", 
                                         "result")
 
-    def list_integrations_for_app(self, app_id: api.Application | str) -> list:
+    def list_integrations_for_app(self, app_id: Application | str) -> list[api.IntegrationListItem]:
         """
         List integrations for an application.
 
@@ -1685,7 +1685,7 @@ class ChirpstackClient:
                                  }
                              })
 
-    def delete_device_keys(self, dev_eui: api.Device | str) -> None:
+    def delete_device_keys(self, dev_eui: Device | str) -> None:
         """
         Delete device keys.
 
@@ -1696,7 +1696,7 @@ class ChirpstackClient:
         return self._call_rpc("DeviceService", "DeleteKeys",
                              "DeleteDeviceKeysRequest", {"dev_eui": str(dev_eui)})
 
-    def activate_device(self, dev_eui: api.Device | str, dev_addr: str, 
+    def activate_device(self, dev_eui: Device | str, dev_addr: str, 
                        nwk_s_key: str, app_s_key: str, f_cnt_up: int = 0, 
                        f_cnt_down: int = 0, skip_f_cnt_check: bool = False) -> None:
         """
@@ -1725,7 +1725,7 @@ class ChirpstackClient:
                                  }
                              })
 
-    def deactivate_device(self, dev_eui: api.Device | str) -> None:
+    def deactivate_device(self, dev_eui: Device | str) -> None:
         """
         Deactivate a device.
 
@@ -1736,7 +1736,7 @@ class ChirpstackClient:
         return self._call_rpc("DeviceService", "Deactivate",
                              "DeactivateDeviceRequest", {"dev_eui": str(dev_eui)})
 
-    def enqueue_device_downlink(self, dev_eui: api.Device | str, data: bytes, 
+    def enqueue_device_downlink(self, dev_eui: Device | str, data: bytes, 
                                f_port: int, confirmed: bool = False) -> None:
         """
         Enqueue a downlink message for a device.
@@ -1758,7 +1758,7 @@ class ChirpstackClient:
                                  }
                              })
 
-    def get_device_queue(self, dev_eui: api.Device | str) -> list:
+    def get_device_queue(self, dev_eui: Device | str) -> list:
         """
         Get the downlink queue for a device.
 
@@ -1770,7 +1770,7 @@ class ChirpstackClient:
                              "GetDeviceQueueItemsRequest", {"dev_eui": str(dev_eui)})
         return list(resp.items)
 
-    def flush_device_queue(self, dev_eui: api.Device | str) -> None:
+    def flush_device_queue(self, dev_eui: Device | str) -> None:
         """
         Flush the downlink queue for a device.
 
@@ -1781,7 +1781,7 @@ class ChirpstackClient:
         return self._call_rpc("DeviceService", "FlushQueue",
                              "FlushDeviceQueueRequest", {"dev_eui": str(dev_eui)})
 
-    def get_device_metrics(self, dev_eui: api.Device | str, start: str, end: str) -> dict:
+    def get_device_metrics(self, dev_eui: Device | str, start: str, end: str) -> dict:
         """
         Get device metrics.
 
@@ -1798,7 +1798,7 @@ class ChirpstackClient:
                                  "end": end
                              })
 
-    def get_device_link_metrics(self, dev_eui: api.Device | str) -> dict:
+    def get_device_link_metrics(self, dev_eui: Device | str) -> dict:
         """
         Get device link metrics.
 
@@ -1809,7 +1809,7 @@ class ChirpstackClient:
         return self._call_rpc("DeviceService", "GetLinkMetrics",
                              "GetDeviceLinkMetricsRequest", {"dev_eui": str(dev_eui)})
 
-    def get_next_f_cnt_down(self, dev_eui: api.Device | str) -> int:
+    def get_next_f_cnt_down(self, dev_eui: Device | str) -> int:
         """
         Get the next frame counter down for a device.
 
@@ -1821,7 +1821,7 @@ class ChirpstackClient:
                              "GetDeviceNextFCntDownRequest", {"dev_eui": str(dev_eui)})
         return resp.f_cnt_down
 
-    def get_random_dev_addr(self, dev_eui: api.Device | str) -> str:
+    def get_random_dev_addr(self, dev_eui: Device | str) -> str:
         """
         Get a random device address for a device.
 
@@ -1833,7 +1833,7 @@ class ChirpstackClient:
                              "GetRandomDevAddrRequest", {"dev_eui": str(dev_eui)})
         return resp.dev_addr
 
-    def flush_dev_nonces(self, dev_eui: api.Device | str) -> None:
+    def flush_dev_nonces(self, dev_eui: Device | str) -> None:
         """
         Flush device nonces.
 
@@ -1898,7 +1898,7 @@ class ChirpstackClient:
                                  }
                              })
 
-    def get_gateway_metrics(self, gateway_id: api.Gateway | str, start: str, end: str) -> dict:
+    def get_gateway_metrics(self, gateway_id: Gateway | str, start: str, end: str) -> dict:
         """
         Get gateway metrics.
 
@@ -1915,7 +1915,7 @@ class ChirpstackClient:
                                  "end": end
                              })
 
-    def get_gateway_duty_cycle_metrics(self, gateway_id: api.Gateway | str, start: str, end: str) -> dict:
+    def get_gateway_duty_cycle_metrics(self, gateway_id: Gateway | str, start: str, end: str) -> dict:
         """
         Get gateway duty cycle metrics.
 
@@ -1932,7 +1932,7 @@ class ChirpstackClient:
                                  "end": end
                              })
 
-    def generate_gateway_client_certificate(self, gateway_id: api.Gateway | str) -> dict:
+    def generate_gateway_client_certificate(self, gateway_id: Gateway | str) -> dict:
         """
         Generate a client certificate for a gateway.
 
@@ -1943,7 +1943,7 @@ class ChirpstackClient:
         return self._call_rpc("GatewayService", "GenerateClientCertificate",
                              "GenerateGatewayClientCertificateRequest", {"gateway_id": str(gateway_id)})
 
-    def get_relay_gateway(self, gateway_id: api.Gateway | str) -> dict:
+    def get_relay_gateway(self, gateway_id: Gateway | str) -> dict:
         """
         Get relay gateway.
 
@@ -1977,7 +1977,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_relay_gateway(): An error occurred with status code {status_code} - {details}")
             return {}
 
-    def update_relay_gateway(self, gateway_id: api.Gateway | str, relay_config: dict) -> None:
+    def update_relay_gateway(self, gateway_id: Gateway | str, relay_config: dict) -> None:
         """
         Update relay gateway configuration.
 
@@ -1992,7 +1992,7 @@ class ChirpstackClient:
                                  "relay": relay_config
                              })
 
-    def delete_relay_gateway(self, gateway_id: api.Gateway | str) -> None:
+    def delete_relay_gateway(self, gateway_id: Gateway | str) -> None:
         """
         Delete relay gateway configuration.
 
@@ -2003,7 +2003,7 @@ class ChirpstackClient:
         return self._call_rpc("GatewayService", "DeleteRelayGateway",
                              "DeleteRelayGatewayRequest", {"gateway_id": str(gateway_id)})
 
-    def list_relay_gateways(self) -> list:
+    def list_relay_gateways(self) -> list[api.RelayGatewayListItem]:
         """
         List all relay gateways.
         """
@@ -2080,7 +2080,7 @@ class ChirpstackClient:
                                  }
                              })
 
-    def list_adr_algorithms(self) -> list:
+    def list_adr_algorithms(self) -> list[api.AdrAlgorithmListItem]:
         """
         List available ADR algorithms.
         """
@@ -2131,7 +2131,7 @@ class ChirpstackClient:
                                  }
                              })
 
-    def get_tenant(self, tenant_id: api.Tenant | str) -> Tenant | None:
+    def get_tenant(self, tenant_id: Tenant | str) -> Tenant | None:
         """
         Get tenant.
 
@@ -2166,7 +2166,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_tenant(): An error occurred with status code {status_code} - {details}")
             return None
 
-    def delete_tenant(self, tenant_id: api.Tenant | str) -> None:
+    def delete_tenant(self, tenant_id: Tenant | str) -> None:
         """
         Delete a Tenant.
 
@@ -2283,7 +2283,7 @@ class ChirpstackClient:
                                  "tenant_id": tenant_id
                              })
 
-    def list_users_for_tenant(self, tenant_id: str) -> list:
+    def list_users_for_tenant(self, tenant_id: str) -> list[api.TenantUserListItem]:
         """
         List users for a tenant.
 
@@ -2390,7 +2390,7 @@ class ChirpstackClient:
         return self._call_rpc("UserService", "Delete",
                              "DeleteUserRequest", {"id": user_id})
 
-    def list_users_standalone(self) -> list:
+    def list_users_standalone(self) -> list[api.UserListItem]:
         """
         List all users (standalone, not tied to tenants).
         """
@@ -2527,7 +2527,7 @@ class ChirpstackClient:
         return self._call_rpc("MulticastGroupService", "Delete",
                              "DeleteMulticastGroupRequest", {"id": multicast_group_id})
 
-    def list_multicast_groups(self, application_id: str) -> list:
+    def list_multicast_groups(self, application_id: str) -> list[api.MulticastGroupListItem]:
         """
         List multicast groups for an application.
 
@@ -2777,7 +2777,7 @@ class ChirpstackClient:
         return self._call_rpc("FuotaService", "DeleteDeployment",
                              "DeleteFuotaDeploymentRequest", {"id": deployment_id})
 
-    def list_fuota_deployments(self, application_id: str) -> list:
+    def list_fuota_deployments(self, application_id: str) -> list[api.FuotaDeploymentListItem]:
         """
         List FUOTA deployments for an application.
 
@@ -2801,7 +2801,7 @@ class ChirpstackClient:
         return self._call_rpc("FuotaService", "StartDeployment",
                              "StartFuotaDeploymentRequest", {"id": deployment_id})
 
-    def list_fuota_devices(self, deployment_id: str) -> list:
+    def list_fuota_devices(self, deployment_id: str) -> list[api.FuotaDeviceListItem]:
         """
         List devices in a FUOTA deployment.
 
@@ -2814,7 +2814,7 @@ class ChirpstackClient:
                                         "ListFuotaDevicesRequest", 
                                         "result")
 
-    def list_fuota_gateways(self, deployment_id: str) -> list:
+    def list_fuota_gateways(self, deployment_id: str) -> list[api.FuotaGatewayListItem]:
         """
         List gateways in a FUOTA deployment.
 
@@ -2827,7 +2827,7 @@ class ChirpstackClient:
                                         "ListFuotaGatewaysRequest", 
                                         "result")
 
-    def list_fuota_jobs(self, deployment_id: str) -> list:
+    def list_fuota_jobs(self, deployment_id: str) -> list[api.FuotaJobListItem]:
         """
         List jobs in a FUOTA deployment.
 
@@ -3031,7 +3031,7 @@ class ChirpstackClient:
         return self._call_rpc("DeviceProfileTemplateService", "Delete",
                              "DeleteDeviceProfileTemplateRequest", {"id": template_id})
 
-    def list_device_profile_templates(self) -> list:
+    def list_device_profile_templates(self) -> list[api.DeviceProfileTemplateListItem]:
         """
         List all device profile templates.
         """
@@ -3132,7 +3132,7 @@ class ChirpstackClient:
         return self._call_rpc("RelayService", "Delete",
                              "DeleteRelayRequest", {"id": relay_id})
 
-    def list_relays(self, tenant_id: str) -> list:
+    def list_relays(self, tenant_id: str) -> list[api.RelayListItem]:
         """
         List relays for a tenant.
 
@@ -3145,7 +3145,7 @@ class ChirpstackClient:
                                         "ListRelaysRequest", 
                                         "result")
 
-    def list_relay_devices(self, relay_id: str) -> list:
+    def list_relay_devices(self, relay_id: str) -> list[api.RelayDeviceListItem]:
         """
         List devices for a relay.
 

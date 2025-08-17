@@ -1,8 +1,29 @@
 [run]
+source = chirpstack_api_wrapper
 omit =
-  */tests/*,
-  tests.py,
-  test_*.py,
-  tests_*.py,
-  *_tests.py,
-  example.py
+    */tests/*,
+    */test/*,
+    tests.py,
+    test_*.py,
+    tests_*.py,
+    *_tests.py,
+    example.py,
+    setup.py,
+    */__pycache__/*,
+    */venv/*,
+    */env/*,
+    */.venv/*,
+    */.env/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod

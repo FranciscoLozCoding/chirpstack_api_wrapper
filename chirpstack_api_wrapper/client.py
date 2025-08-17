@@ -196,49 +196,90 @@ class ChirpstackClient:
             logging.error(f"ChirpstackClient.ping(): {e}")
             return False
 
-    def list_all_devices(self, apps: list[api.ApplicationListItem]) -> list[api.DeviceListItem]:
+    def list_all_devices(self, apps: list[Application]) -> list[Device]:
         """
         List all devices.
 
         Parameters
         ----------
-        - app_resp: Response of ChirpstackClient.list_all_apps().
+        - apps: List of Application objects from ChirpstackClient.list_all_apps().
+
+        Returns
+        -------
+        - List of Device objects.
         """
         devices = []
         for app in apps:
-            devices.extend(
-                self._list_with_pagination(
-                    "DeviceService",
-                    {"application_id": app.id},
-                    "ListDevicesRequest"
-                )
+            api_response = self._list_with_pagination(
+                "DeviceService",
+                {"application_id": app.id},
+                "ListDevicesRequest"
             )
+            for device_item in api_response:
+                device = Device(
+                    name=device_item.name,
+                    dev_eui=device_item.dev_eui,
+                    application_id=device_item.application_id,
+                    device_profile_id=device_item.device_profile_id,
+                    join_eui=device_item.join_eui,
+                    description=device_item.description,
+                    skip_fcnt_check=device_item.skip_fcnt_check,
+                    is_disabled=device_item.is_disabled,
+                    tags=dict(device_item.tags),
+                    variables=dict(device_item.variables)
+                )
+                devices.append(device)
         return devices
 
-    def list_all_apps(self, tenants: list[api.TenantListItem]) -> list[api.ApplicationListItem]:
+    def list_all_apps(self, tenants: list[Tenant]) -> list[Application]:
         """
         List all apps.
 
         Parameters
         ----------
-        - tenant_resp: Response of ChirpstackClient.list_tenants().
+        - tenants: List of Tenant objects from ChirpstackClient.list_tenants().
+
+        Returns
+        -------
+        - List of Application objects.
         """
         apps = []
         for t in tenants:
-            apps.extend(
-                self._list_with_pagination(
-                    "ApplicationService",
-                    {"tenant_id": t.id},
-                    "ListApplicationsRequest"
-                )
+            api_response = self._list_with_pagination(
+                "ApplicationService",
+                {"tenant_id": t.id},
+                "ListApplicationsRequest"
             )
+            for app_item in api_response:
+                app = Application(
+                    name=app_item.name,
+                    tenant_id=app_item.tenant_id,
+                    id=app_item.id,
+                    description=app_item.description,
+                    tags=dict(app_item.tags)
+                )
+                apps.append(app)
         return apps
 
-    def list_tenants(self) -> list[api.TenantListItem]:
+    def list_tenants(self) -> list[Tenant]:
         """
         List all tenants.
+        
+        Returns
+        -------
+        - List of Tenant objects.
         """
-        return self._list_with_pagination("TenantService", {}, "ListTenantsRequest")
+        api_response = self._list_with_pagination("TenantService", {}, "ListTenantsRequest")
+        tenants = []
+        for tenant_item in api_response:
+            tenant = Tenant(
+                name=tenant_item.name,
+                description=tenant_item.description,
+                id=tenant_item.id,
+                tags=dict(tenant_item.tags)
+            )
+            tenants.append(tenant)
+        return tenants
 
     def get_app(self, app_id: Application | str) -> Application | None:
         """
@@ -762,44 +803,148 @@ class ChirpstackClient:
                                  }
                              })
 
-    def list_device_profiles_for_app(self, app_id: Application | str) -> list:
+    def list_device_profiles_for_app(self, app_id: Application | str) -> list[DeviceProfile]:
         """
         List device profiles for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
-        """
-        return self._list_with_pagination("ApplicationService", 
-                                        {"application_id": str(app_id)}, 
-                                        "ListDeviceProfilesRequest", 
-                                        "result")
 
-    def list_device_tags_for_app(self, app_id: Application | str) -> list:
+        Returns
+        -------
+        - List of DeviceProfile objects.
+        """
+        api_response = self._list_with_pagination("ApplicationService", 
+                                                {"application_id": str(app_id)}, 
+                                                "ListDeviceProfilesRequest", 
+                                                "result")
+        device_profiles = []
+        for profile_item in api_response:
+            # Import the enums here to avoid circular imports
+            from chirpstack_api_wrapper.objects import Region, MacVersion, RegParamsRevision, CodecRuntime, AdrAlgorithm, ClassBPingSlot, CadPeriodicity, SecondChAckOffset, RelayModeActivation
+            
+            # Find the enum values by comparing the response values
+            region_enum = next((r for r in Region if r.value == profile_item.region), Region.EU868)
+            mac_version_enum = next((m for m in MacVersion if m.value == profile_item.mac_version), MacVersion.LORAWAN_1_0_0)
+            reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == profile_item.reg_params_revision), RegParamsRevision.A)
+            payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == profile_item.payload_codec_runtime), CodecRuntime.NONE)
+            adr_algorithm_enum = next((a for a in AdrAlgorithm if a.value == profile_item.adr_algorithm_id), AdrAlgorithm.LORA_ONLY)
+            class_b_ping_slot_nb_k_enum = next((c for c in ClassBPingSlot if c.value == profile_item.class_b_ping_slot_periodicity), ClassBPingSlot.NONE)
+            relay_cad_periodicity_enum = next((c for c in CadPeriodicity if c.value == profile_item.relay_cad_periodicity), CadPeriodicity.NONE)
+            relay_second_channel_ack_offset_enum = next((s for s in SecondChAckOffset if s.value == profile_item.relay_second_channel_ack_offset), SecondChAckOffset.NONE)
+            relay_ed_activation_mode_enum = next((r for r in RelayModeActivation if r.value == profile_item.relay_ed_activation_mode), RelayModeActivation.DISABLED)
+            
+            device_profile = DeviceProfile(
+                name=profile_item.name,
+                tenant_id=profile_item.tenant_id,
+                region=region_enum,
+                mac_version=mac_version_enum,
+                reg_params_revision=reg_params_revision_enum,
+                uplink_interval=profile_item.uplink_interval,
+                supports_otaa=profile_item.supports_otaa,
+                abp_rx1_delay=profile_item.abp_rx1_delay,
+                abp_rx1_dr_offset=profile_item.abp_rx1_dr_offset,
+                abp_rx2_dr=profile_item.abp_rx2_dr,
+                abp_rx2_freq=profile_item.abp_rx2_freq,
+                supports_class_b=profile_item.supports_class_b,
+                class_b_timeout=profile_item.class_b_timeout,
+                class_b_ping_slot_nb_k=class_b_ping_slot_nb_k_enum,
+                class_b_ping_slot_dr=profile_item.class_b_ping_slot_dr,
+                class_b_ping_slot_freq=profile_item.class_b_ping_slot_freq,
+                supports_class_c=profile_item.supports_class_c,
+                class_c_timeout=profile_item.class_c_timeout,
+                id=profile_item.id,
+                description=profile_item.description,
+                payload_codec_runtime=payload_codec_runtime_enum,
+                payload_codec_script=profile_item.payload_codec_script,
+                flush_queue_on_activate=profile_item.flush_queue_on_activate,
+                device_status_req_interval=profile_item.device_status_req_interval,
+                tags=dict(profile_item.tags),
+                auto_detect_measurements=profile_item.auto_detect_measurements,
+                allow_roaming=profile_item.allow_roaming,
+                adr_algorithm_id=adr_algorithm_enum,
+                rx1_delay=profile_item.rx1_delay,
+                app_layer_params=dict(profile_item.app_layer_params) if hasattr(profile_item, 'app_layer_params') else {},
+                region_config_id=profile_item.region_config_id,
+                is_relay=profile_item.is_relay,
+                is_relay_ed=profile_item.is_relay_ed,
+                relay_ed_relay_only=profile_item.relay_ed_relay_only,
+                relay_enabled=profile_item.relay_enabled,
+                relay_cad_periodicity=relay_cad_periodicity_enum,
+                relay_default_channel_index=profile_item.relay_default_channel_index,
+                relay_second_channel_freq=profile_item.relay_second_channel_freq,
+                relay_second_channel_dr=profile_item.relay_second_channel_dr,
+                relay_second_channel_ack_offset=relay_second_channel_ack_offset_enum,
+                relay_ed_activation_mode=relay_ed_activation_mode_enum,
+                relay_ed_smart_enable_level=profile_item.relay_ed_smart_enable_level,
+                relay_ed_back_off=profile_item.relay_ed_back_off,
+                relay_ed_uplink_limit_bucket_size=profile_item.relay_ed_uplink_limit_bucket_size,
+                relay_ed_uplink_limit_reload_rate=profile_item.relay_ed_uplink_limit_reload_rate,
+                relay_join_req_limit_reload_rate=profile_item.relay_join_req_limit_reload_rate,
+                relay_notify_limit_reload_rate=profile_item.relay_notify_limit_reload_rate,
+                relay_global_uplink_limit_reload_rate=profile_item.relay_global_uplink_limit_reload_rate,
+                relay_overall_limit_reload_rate=profile_item.relay_overall_limit_reload_rate,
+                relay_join_req_limit_bucket_size=profile_item.relay_join_req_limit_bucket_size,
+                relay_notify_limit_bucket_size=profile_item.relay_notify_limit_bucket_size,
+                relay_global_uplink_limit_bucket_size=profile_item.relay_global_uplink_limit_bucket_size,
+                relay_overall_limit_bucket_size=profile_item.relay_overall_limit_bucket_size,
+                measurements=dict(profile_item.measurements) if hasattr(profile_item, 'measurements') else {}
+            )
+            device_profiles.append(device_profile)
+        return device_profiles
+
+    def list_device_tags_for_app(self, app_id: Application | str) -> list[dict]:
         """
         List device tags for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
-        """
-        return self._list_with_pagination("ApplicationService", 
-                                        {"application_id": str(app_id)}, 
-                                        "ListDeviceTagsRequest", 
-                                        "result")
 
-    def list_integrations_for_app(self, app_id: Application | str) -> list[api.IntegrationListItem]:
+        Returns
+        -------
+        - List of device tag dictionaries.
+        """
+        api_response = self._list_with_pagination("ApplicationService", 
+                                                {"application_id": str(app_id)}, 
+                                                "ListDeviceTagsRequest", 
+                                                "result")
+        device_tags = []
+        for tag_item in api_response:
+            device_tag = {
+                'dev_eui': tag_item.dev_eui,
+                'tags': dict(tag_item.tags)
+            }
+            device_tags.append(device_tag)
+        return device_tags
+
+    def list_integrations_for_app(self, app_id: Application | str) -> list[dict]:
         """
         List integrations for an application.
 
         Parameters
         ----------
         - app_id: Application ID.
+
+        Returns
+        -------
+        - List of integration dictionaries.
         """
-        return self._list_with_pagination("ApplicationService", 
-                                        {"application_id": str(app_id)}, 
-                                        "ListIntegrationsRequest", 
-                                        "result")
+        api_response = self._list_with_pagination("ApplicationService", 
+                                                {"application_id": str(app_id)}, 
+                                                "ListIntegrationsRequest", 
+                                                "result")
+        integrations = []
+        for integration_item in api_response:
+            integration = {
+                'id': integration_item.id,
+                'kind': integration_item.kind,
+                'created_at': integration_item.created_at,
+                'updated_at': integration_item.updated_at
+            }
+            integrations.append(integration)
+        return integrations
 
     def create_http_integration(self, integration: HttpIntegration) -> None:
         """
@@ -2003,11 +2148,23 @@ class ChirpstackClient:
         return self._call_rpc("GatewayService", "DeleteRelayGateway",
                              "DeleteRelayGatewayRequest", {"gateway_id": str(gateway_id)})
 
-    def list_relay_gateways(self) -> list[api.RelayGatewayListItem]:
+    def list_relay_gateways(self) -> list[dict]:
         """
         List all relay gateways.
+        
+        Returns
+        -------
+        - List of relay gateway dictionaries.
         """
-        return self._list_with_pagination("GatewayService", {}, "ListRelayGatewaysRequest", "result")
+        api_response = self._list_with_pagination("GatewayService", {}, "ListRelayGatewaysRequest", "result")
+        relay_gateways = []
+        for gateway_item in api_response:
+            relay_gateway = {
+                'gateway_id': gateway_item.gateway_id,
+                'relay': gateway_item.relay
+            }
+            relay_gateways.append(relay_gateway)
+        return relay_gateways
 
     def update_device_profile(self, device_profile: DeviceProfile) -> None:
         """
@@ -2080,13 +2237,24 @@ class ChirpstackClient:
                                  }
                              })
 
-    def list_adr_algorithms(self) -> list[api.AdrAlgorithmListItem]:
+    def list_adr_algorithms(self) -> list[dict]:
         """
         List available ADR algorithms.
+        
+        Returns
+        -------
+        - List of ADR algorithm dictionaries.
         """
         resp = self._call_rpc("DeviceProfileService", "ListAdrAlgorithms",
                              "ListAdrAlgorithmsRequest")
-        return list(resp.result)
+        algorithms = []
+        for algorithm_item in resp.result:
+            algorithm = {
+                'id': algorithm_item.id,
+                'name': algorithm_item.name
+            }
+            algorithms.append(algorithm)
+        return algorithms
 
     def create_tenant(self, tenant: Tenant) -> None:
         """
@@ -2283,18 +2451,34 @@ class ChirpstackClient:
                                  "tenant_id": tenant_id
                              })
 
-    def list_users_for_tenant(self, tenant_id: str) -> list[api.TenantUserListItem]:
+    def list_users_for_tenant(self, tenant_id: str) -> list[User]:
         """
         List users for a tenant.
 
         Parameters
         ----------
         - tenant_id: Tenant ID.
+
+        Returns
+        -------
+        - List of User objects.
         """
-        return self._list_with_pagination("TenantService", 
-                                        {"tenant_id": tenant_id}, 
-                                        "ListTenantUsersRequest", 
-                                        "result")
+        api_response = self._list_with_pagination("TenantService", 
+                                                {"tenant_id": tenant_id}, 
+                                                "ListTenantUsersRequest", 
+                                                "result")
+        users = []
+        for user_item in api_response:
+            user = User(
+                email=user_item.email,
+                password="",  # Password is not returned by the API
+                is_active=user_item.is_active,
+                is_admin=user_item.is_admin,
+                note=user_item.note,
+                id=user_item.id
+            )
+            users.append(user)
+        return users
 
     def create_user_standalone(self, user: User) -> None:
         """
@@ -2390,11 +2574,27 @@ class ChirpstackClient:
         return self._call_rpc("UserService", "Delete",
                              "DeleteUserRequest", {"id": user_id})
 
-    def list_users_standalone(self) -> list[api.UserListItem]:
+    def list_users_standalone(self) -> list[User]:
         """
         List all users (standalone, not tied to tenants).
+        
+        Returns
+        -------
+        - List of User objects.
         """
-        return self._list_with_pagination("UserService", {}, "ListUsersRequest", "result")
+        api_response = self._list_with_pagination("UserService", {}, "ListUsersRequest", "result")
+        users = []
+        for user_item in api_response:
+            user = User(
+                email=user_item.email,
+                password="",  # Password is not returned by the API
+                is_active=user_item.is_active,
+                is_admin=user_item.is_admin,
+                note=user_item.note,
+                id=user_item.id
+            )
+            users.append(user)
+        return users
 
     def update_user_password(self, user_id: str, password: str) -> None:
         """
@@ -2527,18 +2727,45 @@ class ChirpstackClient:
         return self._call_rpc("MulticastGroupService", "Delete",
                              "DeleteMulticastGroupRequest", {"id": multicast_group_id})
 
-    def list_multicast_groups(self, application_id: str) -> list[api.MulticastGroupListItem]:
+    def list_multicast_groups(self, application_id: str) -> list[MulticastGroup]:
         """
         List multicast groups for an application.
 
         Parameters
         ----------
         - application_id: Application ID.
+
+        Returns
+        -------
+        - List of MulticastGroup objects.
         """
-        return self._list_with_pagination("MulticastGroupService", 
-                                        {"application_id": application_id}, 
-                                        "ListMulticastGroupsRequest", 
-                                        "result")
+        api_response = self._list_with_pagination("MulticastGroupService", 
+                                                {"application_id": application_id}, 
+                                                "ListMulticastGroupsRequest", 
+                                                "result")
+        multicast_groups = []
+        for group_item in api_response:
+            # Import the enum here to avoid circular imports
+            from chirpstack_api_wrapper.objects import MulticastGroupType
+            
+            # Find the enum value by comparing the response value
+            group_type_enum = next((g for g in MulticastGroupType if g.value == group_item.group_type), MulticastGroupType.CLASS_C)
+            
+            multicast_group = MulticastGroup(
+                name=group_item.name,
+                mc_addr=group_item.mc_addr,
+                mc_nwk_s_key=group_item.mc_nwk_s_key,
+                mc_app_s_key=group_item.mc_app_s_key,
+                f_cnt=group_item.f_cnt,
+                group_type=group_type_enum,
+                mc_timeout=group_item.mc_timeout,
+                application_id=group_item.application_id,
+                id=group_item.id,
+                description=group_item.description,
+                tags=dict(group_item.tags)
+            )
+            multicast_groups.append(multicast_group)
+        return multicast_groups
 
     def add_device_to_multicast_group(self, multicast_group_id: str, dev_eui: str) -> None:
         """
@@ -2777,18 +3004,51 @@ class ChirpstackClient:
         return self._call_rpc("FuotaService", "DeleteDeployment",
                              "DeleteFuotaDeploymentRequest", {"id": deployment_id})
 
-    def list_fuota_deployments(self, application_id: str) -> list[api.FuotaDeploymentListItem]:
+    def list_fuota_deployments(self, application_id: str) -> list[FuotaDeployment]:
         """
         List FUOTA deployments for an application.
 
         Parameters
         ----------
         - application_id: Application ID.
+
+        Returns
+        -------
+        - List of FuotaDeployment objects.
         """
-        return self._list_with_pagination("FuotaService", 
-                                        {"application_id": application_id}, 
-                                        "ListFuotaDeploymentsRequest", 
-                                        "result")
+        api_response = self._list_with_pagination("FuotaService", 
+                                                {"application_id": application_id}, 
+                                                "ListFuotaDeploymentsRequest", 
+                                                "result")
+        fuota_deployments = []
+        for deployment_item in api_response:
+            # Import the enum here to avoid circular imports
+            from chirpstack_api_wrapper.objects import MulticastGroupType
+            
+            # Find the enum values by comparing the response values
+            multicast_group_type_enum = next((m for m in MulticastGroupType if m.value == deployment_item.multicast_group_type), MulticastGroupType.CLASS_C)
+            group_type_enum = next((g for g in MulticastGroupType if g.value == deployment_item.group_type), MulticastGroupType.CLASS_C)
+            
+            fuota_deployment = FuotaDeployment(
+                name=deployment_item.name,
+                application_id=deployment_item.application_id,
+                device_profile_id=deployment_item.device_profile_id,
+                multicast_group_id=deployment_item.multicast_group_id,
+                multicast_group_type=multicast_group_type_enum,
+                mc_addr=deployment_item.mc_addr,
+                mc_nwk_s_key=deployment_item.mc_nwk_s_key,
+                mc_app_s_key=deployment_item.mc_app_s_key,
+                f_cnt=deployment_item.f_cnt,
+                group_type=group_type_enum,
+                dr=deployment_item.dr,
+                frequency=deployment_item.frequency,
+                class_c_timeout=deployment_item.class_c_timeout,
+                id=deployment_item.id,
+                description=deployment_item.description,
+                tags=dict(deployment_item.tags)
+            )
+            fuota_deployments.append(fuota_deployment)
+        return fuota_deployments
 
     def start_fuota_deployment(self, deployment_id: str) -> None:
         """
@@ -2801,44 +3061,83 @@ class ChirpstackClient:
         return self._call_rpc("FuotaService", "StartDeployment",
                              "StartFuotaDeploymentRequest", {"id": deployment_id})
 
-    def list_fuota_devices(self, deployment_id: str) -> list[api.FuotaDeviceListItem]:
+    def list_fuota_devices(self, deployment_id: str) -> list[dict]:
         """
         List devices in a FUOTA deployment.
 
         Parameters
         ----------
         - deployment_id: Deployment ID.
-        """
-        return self._list_with_pagination("FuotaService", 
-                                        {"deployment_id": deployment_id}, 
-                                        "ListFuotaDevicesRequest", 
-                                        "result")
 
-    def list_fuota_gateways(self, deployment_id: str) -> list[api.FuotaGatewayListItem]:
+        Returns
+        -------
+        - List of FUOTA device dictionaries.
+        """
+        api_response = self._list_with_pagination("FuotaService", 
+                                                {"deployment_id": deployment_id}, 
+                                                "ListFuotaDevicesRequest", 
+                                                "result")
+        fuota_devices = []
+        for device_item in api_response:
+            fuota_device = {
+                'dev_eui': device_item.dev_eui,
+                'created_at': device_item.created_at,
+                'updated_at': device_item.updated_at
+            }
+            fuota_devices.append(fuota_device)
+        return fuota_devices
+
+    def list_fuota_gateways(self, deployment_id: str) -> list[dict]:
         """
         List gateways in a FUOTA deployment.
 
         Parameters
         ----------
         - deployment_id: Deployment ID.
-        """
-        return self._list_with_pagination("FuotaService", 
-                                        {"deployment_id": deployment_id}, 
-                                        "ListFuotaGatewaysRequest", 
-                                        "result")
 
-    def list_fuota_jobs(self, deployment_id: str) -> list[api.FuotaJobListItem]:
+        Returns
+        -------
+        - List of FUOTA gateway dictionaries.
+        """
+        api_response = self._list_with_pagination("FuotaService", 
+                                                {"deployment_id": deployment_id}, 
+                                                "ListFuotaGatewaysRequest", 
+                                                "result")
+        fuota_gateways = []
+        for gateway_item in api_response:
+            fuota_gateway = {
+                'gateway_id': gateway_item.gateway_id,
+                'created_at': gateway_item.created_at,
+                'updated_at': gateway_item.updated_at
+            }
+            fuota_gateways.append(fuota_gateway)
+        return fuota_gateways
+
+    def list_fuota_jobs(self, deployment_id: str) -> list[dict]:
         """
         List jobs in a FUOTA deployment.
 
         Parameters
         ----------
         - deployment_id: Deployment ID.
+
+        Returns
+        -------
+        - List of FUOTA job dictionaries.
         """
-        return self._list_with_pagination("FuotaService", 
-                                        {"deployment_id": deployment_id}, 
-                                        "ListFuotaJobsRequest", 
-                                        "result")
+        api_response = self._list_with_pagination("FuotaService", 
+                                                {"deployment_id": deployment_id}, 
+                                                "ListFuotaJobsRequest", 
+                                                "result")
+        fuota_jobs = []
+        for job_item in api_response:
+            fuota_job = {
+                'id': job_item.id,
+                'created_at': job_item.created_at,
+                'updated_at': job_item.updated_at
+            }
+            fuota_jobs.append(fuota_job)
+        return fuota_jobs
 
     def add_devices_to_fuota(self, deployment_id: str, dev_euis: list) -> None:
         """
@@ -3031,11 +3330,45 @@ class ChirpstackClient:
         return self._call_rpc("DeviceProfileTemplateService", "Delete",
                              "DeleteDeviceProfileTemplateRequest", {"id": template_id})
 
-    def list_device_profile_templates(self) -> list[api.DeviceProfileTemplateListItem]:
+    def list_device_profile_templates(self) -> list[DeviceProfileTemplate]:
         """
         List all device profile templates.
+        
+        Returns
+        -------
+        - List of DeviceProfileTemplate objects.
         """
-        return self._list_with_pagination("DeviceProfileTemplateService", {}, "ListDeviceProfileTemplatesRequest", "result")
+        api_response = self._list_with_pagination("DeviceProfileTemplateService", {}, "ListDeviceProfileTemplatesRequest", "result")
+        templates = []
+        for template_item in api_response:
+            # Import the enums here to avoid circular imports
+            from chirpstack_api_wrapper.objects import Region, MacVersion, RegParamsRevision, CodecRuntime
+            
+            # Find the enum values by comparing the response values
+            region_enum = next((r for r in Region if r.value == template_item.region), Region.EU868)
+            mac_version_enum = next((m for m in MacVersion if m.value == template_item.mac_version), MacVersion.LORAWAN_1_0_0)
+            reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == template_item.reg_params_revision), RegParamsRevision.A)
+            payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == template_item.payload_codec_runtime), CodecRuntime.NONE)
+            
+            template = DeviceProfileTemplate(
+                name=template_item.name,
+                vendor=template_item.vendor,
+                firmware=template_item.firmware,
+                region=region_enum,
+                mac_version=mac_version_enum,
+                reg_params_revision=reg_params_revision_enum,
+                adr_algorithm_id=template_item.adr_algorithm_id,
+                payload_codec_runtime=payload_codec_runtime_enum,
+                uplink_interval=template_item.uplink_interval,
+                supports_otaa=template_item.supports_otaa,
+                supports_class_b=template_item.supports_class_b,
+                supports_class_c=template_item.supports_class_c,
+                id=template_item.id,
+                description=template_item.description,
+                tags=dict(template_item.tags)
+            )
+            templates.append(template)
+        return templates
 
     def create_relay(self, relay: Relay) -> None:
         """
@@ -3132,31 +3465,60 @@ class ChirpstackClient:
         return self._call_rpc("RelayService", "Delete",
                              "DeleteRelayRequest", {"id": relay_id})
 
-    def list_relays(self, tenant_id: str) -> list[api.RelayListItem]:
+    def list_relays(self, tenant_id: str) -> list[Relay]:
         """
         List relays for a tenant.
 
         Parameters
         ----------
         - tenant_id: Tenant ID.
-        """
-        return self._list_with_pagination("RelayService", 
-                                        {"tenant_id": tenant_id}, 
-                                        "ListRelaysRequest", 
-                                        "result")
 
-    def list_relay_devices(self, relay_id: str) -> list[api.RelayDeviceListItem]:
+        Returns
+        -------
+        - List of Relay objects.
+        """
+        api_response = self._list_with_pagination("RelayService", 
+                                                {"tenant_id": tenant_id}, 
+                                                "ListRelaysRequest", 
+                                                "result")
+        relays = []
+        for relay_item in api_response:
+            relay = Relay(
+                name=relay_item.name,
+                tenant_id=relay_item.tenant_id,
+                device_id=relay_item.device_id,
+                id=relay_item.id,
+                description=relay_item.description,
+                tags=dict(relay_item.tags)
+            )
+            relays.append(relay)
+        return relays
+
+    def list_relay_devices(self, relay_id: str) -> list[dict]:
         """
         List devices for a relay.
 
         Parameters
         ----------
         - relay_id: Relay ID.
+
+        Returns
+        -------
+        - List of relay device dictionaries.
         """
-        return self._list_with_pagination("RelayService", 
-                                        {"relay_id": relay_id}, 
-                                        "ListRelayDevicesRequest", 
-                                        "result")
+        api_response = self._list_with_pagination("RelayService", 
+                                                {"relay_id": relay_id}, 
+                                                "ListRelayDevicesRequest", 
+                                                "result")
+        relay_devices = []
+        for device_item in api_response:
+            relay_device = {
+                'dev_eui': device_item.dev_eui,
+                'created_at': device_item.created_at,
+                'updated_at': device_item.updated_at
+            }
+            relay_devices.append(relay_device)
+        return relay_devices
 
     def add_device_to_relay(self, relay_id: str, dev_eui: str) -> None:
         """

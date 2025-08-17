@@ -1,3 +1,6 @@
 __pycache__/
 .coverage
 .pytest_cache
+coverage.xml
+coverage.lcov
+coverage.html

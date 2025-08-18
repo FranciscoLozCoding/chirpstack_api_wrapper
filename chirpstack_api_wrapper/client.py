@@ -210,13 +210,29 @@ class ChirpstackClient:
         """
         devices = []
         for app in apps:
-            api_response = self._list_with_pagination(
+            # First list the Device summary items for this application
+            list_response = self._list_with_pagination(
                 "DeviceService",
                 {"application_id": app.id},
                 "ListDevicesRequest"
             )
-            for device_item in api_response:
-                devices.append(Device.from_grpc(device_item))
+            
+            # For each summary item, fetch the full Device using Get
+            for device_item in list_response:
+                try:
+                    get_resp = self._call_rpc(
+                        "DeviceService",
+                        "Get",
+                        request_type="GetDeviceRequest",
+                        params={"dev_eui": getattr(device_item, "dev_eui", "")}
+                    )
+                    if get_resp and hasattr(get_resp, "device"):
+                        devices.append(Device.from_grpc(get_resp.device))
+                except grpc.RpcError as e:
+                    logging.error(
+                        f"ChirpstackClient.list_all_devices(): Failed to fetch full device for dev_eui={getattr(device_item, 'dev_eui', '')} - {e.code()} {e.details()}"
+                    )
+                    continue
         return devices
 
     def list_all_apps(self, tenants: list[Tenant]) -> list[Application]:
@@ -233,13 +249,29 @@ class ChirpstackClient:
         """
         apps = []
         for t in tenants:
-            api_response = self._list_with_pagination(
+            # First list the Application summary items for this tenant
+            list_response = self._list_with_pagination(
                 "ApplicationService",
                 {"tenant_id": t.id},
                 "ListApplicationsRequest"
             )
-            for app_item in api_response:
-                apps.append(Application.from_grpc(app_item))
+            
+            # For each summary item, fetch the full Application using Get
+            for app_item in list_response:
+                try:
+                    get_resp = self._call_rpc(
+                        "ApplicationService",
+                        "Get",
+                        request_type="GetApplicationRequest",
+                        params={"id": getattr(app_item, "id", "")}
+                    )
+                    if get_resp and hasattr(get_resp, "application"):
+                        apps.append(Application.from_grpc(get_resp.application))
+                except grpc.RpcError as e:
+                    logging.error(
+                        f"ChirpstackClient.list_all_apps(): Failed to fetch full application for id={getattr(app_item, 'id', '')} - {e.code()} {e.details()}"
+                    )
+                    continue
         return apps
 
     def list_tenants(self) -> list[Tenant]:
@@ -250,10 +282,26 @@ class ChirpstackClient:
         -------
         - List of Tenant objects.
         """
-        api_response = self._list_with_pagination("TenantService", {}, "ListTenantsRequest")
+        # First list the Tenant summary items
+        list_response = self._list_with_pagination("TenantService", {}, "ListTenantsRequest")
         tenants = []
-        for tenant_item in api_response:
-            tenants.append(Tenant.from_grpc(tenant_item))
+        
+        # For each summary item, fetch the full Tenant using Get
+        for tenant_item in list_response:
+            try:
+                get_resp = self._call_rpc(
+                    "TenantService",
+                    "Get",
+                    request_type="GetTenantRequest",
+                    params={"id": getattr(tenant_item, "id", "")}
+                )
+                if get_resp and hasattr(get_resp, "tenant"):
+                    tenants.append(Tenant.from_grpc(get_resp.tenant))
+            except grpc.RpcError as e:
+                logging.error(
+                    f"ChirpstackClient.list_tenants(): Failed to fetch full tenant for id={getattr(tenant_item, 'id', '')} - {e.code()} {e.details()}"
+                )
+                continue
         return tenants
 
     def get_app(self, app_id: Application | str) -> Application | None:
@@ -374,7 +422,7 @@ class ChirpstackClient:
                 logging.error(f"ChirpstackClient.get_device_app_key(): An error occurred with status code {status_code} - {details}")
             return ""
 
-    def get_device_activation(self, deveui: Device | str) -> dict:
+    def get_device_activation(self, deveui: Device | str) -> DeviceActivation | None:
         """
         Get Activation returns the current activation details of the device (OTAA or ABP).
 
@@ -382,17 +430,24 @@ class ChirpstackClient:
         ----------
         - dev_eui: unique identifier of the device.
             Passing in a Device object will also work.
+
+        Returns
+        -------
+        - DeviceActivation object or None if not found.
         """
         try:
-            return self._call_rpc("DeviceService", "GetActivation",
-                                 "GetDeviceActivationRequest", {"dev_eui": str(deveui)})
+            response = self._call_rpc("DeviceService", "GetActivation",
+                                     "GetDeviceActivationRequest", {"dev_eui": str(deveui)})
+            
+            return DeviceActivation.from_grpc(response.device_activation)
+            
         except grpc.RpcError as e:
             status_code, details = e.code(), e.details()
             if status_code == grpc.StatusCode.NOT_FOUND:
                 logging.error(f"ChirpstackClient.get_device_activation(): Device Activation {deveui} not found - {details}")
             else:
-                logging.error(f"ChirpstackClient.get_device_profile(): An error occurred with status code {status_code} - {details}")
-            return {}
+                logging.error(f"ChirpstackClient.get_device_activation(): An error occurred with status code {status_code} - {details}")
+            return None
 
     def get_gateway(self, gateway_id: Gateway | str) -> Gateway | None:
         """
@@ -477,7 +532,7 @@ class ChirpstackClient:
                                             "abp_rx2_freq": getattr(device_profile, 'abp_rx2_freq', 0),
                                             "supports_class_b": getattr(device_profile, 'supports_class_b', False),
                                             "class_b_timeout": getattr(device_profile, 'class_b_timeout', 0),
-                                            "class_b_ping_slot_nb_k": getattr(device_profile, 'class_b_ping_slot_nb_k', 0),
+                                            "class_b_ping_slot_periodicity": getattr(device_profile, 'class_b_ping_slot_periodicity', 0),
                                             "class_b_ping_slot_dr": getattr(device_profile, 'class_b_ping_slot_dr', 0),
                                             "class_b_ping_slot_freq": getattr(device_profile, 'class_b_ping_slot_freq', 0),
                                             "supports_class_c": getattr(device_profile, 'supports_class_c', False),
@@ -491,7 +546,7 @@ class ChirpstackClient:
                                             "allow_roaming": getattr(device_profile, 'allow_roaming', False),
                                             "adr_algorithm_id": getattr(device_profile, 'adr_algorithm_id', ''),
                                             "rx1_delay": getattr(device_profile, 'rx1_delay', 0),
-                                            "app_layer_params": getattr(device_profile, 'app_layer_params', {}),
+                                            "app_layer_params": getattr(device_profile, 'app_layer_params', {}).to_dict(),
                                             "region_config_id": getattr(device_profile, 'region_config_id', ''),
                                             "is_relay": getattr(device_profile, 'is_relay', False),
                                             "is_relay_ed": getattr(device_profile, 'is_relay_ed', False),
@@ -547,7 +602,6 @@ class ChirpstackClient:
                                             "variables": getattr(device, 'variables', {})
                                         }
                                     })
-        device.dev_eui = resp.dev_eui #attach chirp generated dev_eui to device object
         return
 
     def create_device_keys(self,device_keys:DeviceKeys) -> None:
@@ -581,7 +635,7 @@ class ChirpstackClient:
         if not isinstance(gateway, Gateway):
             raise TypeError("Expected Gateway object")
         
-        resp = self._call_rpc("GatewayService", "Create",
+        self._call_rpc("GatewayService", "Create",
                                     "CreateGatewayRequest", {
                                         "gateway": {
                                             "gateway_id": getattr(gateway, 'gateway_id', ''),
@@ -594,7 +648,6 @@ class ChirpstackClient:
                                             "metadata": getattr(gateway, 'metadata', {})
                                         }
                                     })
-        gateway.id = resp.id #attach chirp generated uuid to gateway object
         return
 
     def delete_app(self, app_id: Application | str) -> None:
@@ -679,13 +732,29 @@ class ChirpstackClient:
         -------
         - List of DeviceProfile objects.
         """
-        api_response = self._list_with_pagination("ApplicationService", 
+        # First list the DeviceProfile summary items for this application
+        list_response = self._list_with_pagination("ApplicationService", 
                                                 {"application_id": str(app_id)}, 
                                                 "ListDeviceProfilesRequest", 
                                                 "result")
         device_profiles = []
-        for profile_item in api_response:
-            device_profiles.append(DeviceProfile.from_grpc(profile_item))
+        
+        # For each summary item, fetch the full DeviceProfile using Get
+        for profile_item in list_response:
+            try:
+                get_resp = self._call_rpc(
+                    "DeviceProfileService",
+                    "Get",
+                    request_type="GetDeviceProfileRequest",
+                    params={"id": getattr(profile_item, "id", "")}
+                )
+                if get_resp and hasattr(get_resp, "device_profile"):
+                    device_profiles.append(DeviceProfile.from_grpc(get_resp.device_profile))
+            except grpc.RpcError as e:
+                logging.error(
+                    f"ChirpstackClient.list_device_profiles_for_app(): Failed to fetch full device profile for id={getattr(profile_item, 'id', '')} - {e.code()} {e.details()}"
+                )
+                continue
         return device_profiles
 
     def list_device_tags_for_app(self, app_id: Application | str) -> list[dict]:
@@ -1968,60 +2037,60 @@ class ChirpstackClient:
         return self._call_rpc("DeviceProfileService", "Update",
                              "UpdateDeviceProfileRequest", {
                                  "device_profile": {
-                                     "id": getattr(device_profile, 'id', ''),
-                                     "name": getattr(device_profile, 'name', ''),
-                                     "tenant_id": getattr(device_profile, 'tenant_id', ''),
-                                     "region": getattr(device_profile, 'region', ''),
-                                     "mac_version": getattr(device_profile, 'mac_version', ''),
-                                     "reg_params_revision": getattr(device_profile, 'reg_params_revision', ''),
-                                     "uplink_interval": getattr(device_profile, 'uplink_interval', ''),
-                                     "supports_otaa": getattr(device_profile, 'supports_otaa', ''),
-                                     "abp_rx1_delay": getattr(device_profile, 'abp_rx1_delay', ''),
-                                     "abp_rx1_dr_offset": getattr(device_profile, 'abp_rx1_dr_offset', ''),
-                                     "abp_rx2_dr": getattr(device_profile, 'abp_rx2_dr', ''),
-                                     "abp_rx2_freq": getattr(device_profile, 'abp_rx2_freq', ''),
-                                     "supports_class_b": getattr(device_profile, 'supports_class_b', ''),
-                                     "class_b_timeout": getattr(device_profile, 'class_b_timeout', ''),
-                                     "class_b_ping_slot_nb_k": getattr(device_profile, 'class_b_ping_slot_nb_k', ''),
-                                     "class_b_ping_slot_dr": getattr(device_profile, 'class_b_ping_slot_dr', ''),
-                                     "class_b_ping_slot_freq": getattr(device_profile, 'class_b_ping_slot_freq', ''),
-                                     "supports_class_c": getattr(device_profile, 'supports_class_c', ''),
-                                     "class_c_timeout": getattr(device_profile, 'class_c_timeout', ''),
-                                     "description": getattr(device_profile, 'description', ''),
-                                     "payload_codec_runtime": getattr(device_profile, 'payload_codec_runtime', ''),
-                                     "payload_codec_script": getattr(device_profile, 'payload_codec_script', ''),
-                                     "flush_queue_on_activate": getattr(device_profile, 'flush_queue_on_activate', ''),
-                                     "device_status_req_interval": getattr(device_profile, 'device_status_req_interval', ''),
-                                     "auto_detect_measurements": getattr(device_profile, 'auto_detect_measurements', ''),
-                                     "allow_roaming": getattr(device_profile, 'allow_roaming', ''),
-                                     "adr_algorithm_id": getattr(device_profile, 'adr_algorithm_id', ''),
-                                            "rx1_delay": getattr(device_profile, 'rx1_delay', ''),
-                                            "app_layer_params": getattr(device_profile, 'app_layer_params', ''),
-                                            "region_config_id": getattr(device_profile, 'region_config_id', ''),
-                                            "is_relay": getattr(device_profile, 'is_relay', ''),
-                                            "is_relay_ed": getattr(device_profile, 'is_relay_ed', ''),
-                                            "relay_ed_relay_only": getattr(device_profile, 'relay_ed_relay_only', ''),
-                                            "relay_enabled": getattr(device_profile, 'relay_enabled', ''),
-                                            "relay_cad_periodicity": getattr(device_profile, 'relay_cad_periodicity', ''),
-                                            "relay_default_channel_index": getattr(device_profile, 'relay_default_channel_index', ''),
-                                            "relay_second_channel_freq": getattr(device_profile, 'relay_second_channel_freq', ''),
-                                            "relay_second_channel_dr": getattr(device_profile, 'relay_second_channel_dr', ''),
-                                            "relay_second_channel_ack_offset": getattr(device_profile, 'relay_second_channel_ack_offset', ''),
-                                            "relay_ed_activation_mode": getattr(device_profile, 'relay_ed_activation_mode', ''),
-                                            "relay_ed_smart_enable_level": getattr(device_profile, 'relay_ed_smart_enable_level', ''),
-                                            "relay_ed_back_off": getattr(device_profile, 'relay_ed_back_off', ''),
-                                            "relay_ed_uplink_limit_bucket_size": getattr(device_profile, 'relay_ed_uplink_limit_bucket_size', ''),
-                                            "relay_ed_uplink_limit_reload_rate": getattr(device_profile, 'relay_ed_uplink_limit_reload_rate', ''),
-                                            "relay_join_req_limit_reload_rate": getattr(device_profile, 'relay_join_req_limit_reload_rate', ''),
-                                            "relay_notify_limit_reload_rate": getattr(device_profile, 'relay_notify_limit_reload_rate', ''),
-                                            "relay_global_uplink_limit_reload_rate": getattr(device_profile, 'relay_global_uplink_limit_reload_rate', ''),
-                                            "relay_overall_limit_reload_rate": getattr(device_profile, 'relay_overall_limit_reload_rate', ''),
-                                            "relay_join_req_limit_bucket_size": getattr(device_profile, 'relay_join_req_limit_bucket_size', ''),
-                                            "relay_notify_limit_bucket_size": getattr(device_profile, 'relay_notify_limit_bucket_size', ''),
-                                            "relay_global_uplink_limit_bucket_size": getattr(device_profile, 'relay_global_uplink_limit_bucket_size', ''),
-                                            "relay_overall_limit_bucket_size": getattr(device_profile, 'relay_overall_limit_bucket_size', ''),
-                                            "measurements": getattr(device_profile, 'measurements', {}),
-                                            "tags": getattr(device_profile, 'tags', {})
+                                    "id": getattr(device_profile, 'id', ''),
+                                    "name": getattr(device_profile, 'name', ''),
+                                    "tenant_id": getattr(device_profile, 'tenant_id', ''),
+                                    "region": getattr(device_profile, 'region', ''),
+                                    "mac_version": getattr(device_profile, 'mac_version', ''),
+                                    "reg_params_revision": getattr(device_profile, 'reg_params_revision', ''),
+                                    "uplink_interval": getattr(device_profile, 'uplink_interval', ''),
+                                    "supports_otaa": getattr(device_profile, 'supports_otaa', ''),
+                                    "abp_rx1_delay": getattr(device_profile, 'abp_rx1_delay', ''),
+                                    "abp_rx1_dr_offset": getattr(device_profile, 'abp_rx1_dr_offset', ''),
+                                    "abp_rx2_dr": getattr(device_profile, 'abp_rx2_dr', ''),
+                                    "abp_rx2_freq": getattr(device_profile, 'abp_rx2_freq', ''),
+                                    "supports_class_b": getattr(device_profile, 'supports_class_b', ''),
+                                    "class_b_timeout": getattr(device_profile, 'class_b_timeout', ''),
+                                    "class_b_ping_slot_periodicity": getattr(device_profile, 'class_b_ping_slot_periodicity', ''),
+                                    "class_b_ping_slot_dr": getattr(device_profile, 'class_b_ping_slot_dr', ''),
+                                    "class_b_ping_slot_freq": getattr(device_profile, 'class_b_ping_slot_freq', ''),
+                                    "supports_class_c": getattr(device_profile, 'supports_class_c', ''),
+                                    "class_c_timeout": getattr(device_profile, 'class_c_timeout', ''),
+                                    "description": getattr(device_profile, 'description', ''),
+                                    "payload_codec_runtime": getattr(device_profile, 'payload_codec_runtime', ''),
+                                    "payload_codec_script": getattr(device_profile, 'payload_codec_script', ''),
+                                    "flush_queue_on_activate": getattr(device_profile, 'flush_queue_on_activate', ''),
+                                    "device_status_req_interval": getattr(device_profile, 'device_status_req_interval', ''),
+                                    "auto_detect_measurements": getattr(device_profile, 'auto_detect_measurements', ''),
+                                    "allow_roaming": getattr(device_profile, 'allow_roaming', ''),
+                                    "adr_algorithm_id": getattr(device_profile, 'adr_algorithm_id', ''),
+                                    "rx1_delay": getattr(device_profile, 'rx1_delay', ''),
+                                    "app_layer_params": getattr(device_profile, 'app_layer_params', {}).to_dict(),
+                                    "region_config_id": getattr(device_profile, 'region_config_id', ''),
+                                    "is_relay": getattr(device_profile, 'is_relay', ''),
+                                    "is_relay_ed": getattr(device_profile, 'is_relay_ed', ''),
+                                    "relay_ed_relay_only": getattr(device_profile, 'relay_ed_relay_only', ''),
+                                    "relay_enabled": getattr(device_profile, 'relay_enabled', ''),
+                                    "relay_cad_periodicity": getattr(device_profile, 'relay_cad_periodicity', ''),
+                                    "relay_default_channel_index": getattr(device_profile, 'relay_default_channel_index', ''),
+                                    "relay_second_channel_freq": getattr(device_profile, 'relay_second_channel_freq', ''),
+                                    "relay_second_channel_dr": getattr(device_profile, 'relay_second_channel_dr', ''),
+                                    "relay_second_channel_ack_offset": getattr(device_profile, 'relay_second_channel_ack_offset', ''),
+                                    "relay_ed_activation_mode": getattr(device_profile, 'relay_ed_activation_mode', ''),
+                                    "relay_ed_smart_enable_level": getattr(device_profile, 'relay_ed_smart_enable_level', ''),
+                                    "relay_ed_back_off": getattr(device_profile, 'relay_ed_back_off', ''),
+                                    "relay_ed_uplink_limit_bucket_size": getattr(device_profile, 'relay_ed_uplink_limit_bucket_size', ''),
+                                    "relay_ed_uplink_limit_reload_rate": getattr(device_profile, 'relay_ed_uplink_limit_reload_rate', ''),
+                                    "relay_join_req_limit_reload_rate": getattr(device_profile, 'relay_join_req_limit_reload_rate', ''),
+                                    "relay_notify_limit_reload_rate": getattr(device_profile, 'relay_notify_limit_reload_rate', ''),
+                                    "relay_global_uplink_limit_reload_rate": getattr(device_profile, 'relay_global_uplink_limit_reload_rate', ''),
+                                    "relay_overall_limit_reload_rate": getattr(device_profile, 'relay_overall_limit_reload_rate', ''),
+                                    "relay_join_req_limit_bucket_size": getattr(device_profile, 'relay_join_req_limit_bucket_size', ''),
+                                    "relay_notify_limit_bucket_size": getattr(device_profile, 'relay_notify_limit_bucket_size', ''),
+                                    "relay_global_uplink_limit_bucket_size": getattr(device_profile, 'relay_global_uplink_limit_bucket_size', ''),
+                                    "relay_overall_limit_bucket_size": getattr(device_profile, 'relay_overall_limit_bucket_size', ''),
+                                    "measurements": getattr(device_profile, 'measurements', {}),
+                                    "tags": getattr(device_profile, 'tags', {})
                                  }
                              })
 
@@ -2060,6 +2129,11 @@ class ChirpstackClient:
                                  "tenant": {
                                      "name": getattr(tenant, 'name', ''),
                                      "description": getattr(tenant, 'description', ''),
+                                     "can_have_gateways": getattr(tenant, 'can_have_gateways', False),
+                                     "max_gateway_count": getattr(tenant, 'max_gateway_count', 0),
+                                     "max_device_count": getattr(tenant, 'max_device_count', 0),
+                                     "private_gateways_up": getattr(tenant, 'private_gateways_up', False),
+                                     "private_gateways_down": getattr(tenant, 'private_gateways_down', False),
                                      "tags": getattr(tenant, 'tags', {})
                                  }
                              })
@@ -2083,6 +2157,11 @@ class ChirpstackClient:
                                      "id": tenant.id,
                                      "name": getattr(tenant, 'name', ''),
                                      "description": getattr(tenant, 'description', ''),
+                                     "can_have_gateways": getattr(tenant, 'can_have_gateways', False),
+                                     "max_gateway_count": getattr(tenant, 'max_gateway_count', 0),
+                                     "max_device_count": getattr(tenant, 'max_device_count', 0),
+                                     "private_gateways_up": getattr(tenant, 'private_gateways_up', False),
+                                     "private_gateways_down": getattr(tenant, 'private_gateways_down', False),
                                      "tags": getattr(tenant, 'tags', {})
                                  }
                              })
@@ -2237,13 +2316,29 @@ class ChirpstackClient:
         -------
         - List of User objects.
         """
-        api_response = self._list_with_pagination("TenantService", 
+        # First list the User summary items for this tenant
+        list_response = self._list_with_pagination("TenantService", 
                                                 {"tenant_id": tenant_id}, 
                                                 "ListTenantUsersRequest", 
                                                 "result")
         users = []
-        for user_item in api_response:
-            users.append(User.from_grpc(user_item))
+        
+        # For each summary item, fetch the full User using Get
+        for user_item in list_response:
+            try:
+                get_resp = self._call_rpc(
+                    "TenantService",
+                    "GetUser",
+                    request_type="GetTenantUserRequest",
+                    params={"user_id": getattr(user_item, "id", ""), "tenant_id": tenant_id}
+                )
+                if get_resp and hasattr(get_resp, "user"):
+                    users.append(User.from_grpc(get_resp.user))
+            except grpc.RpcError as e:
+                logging.error(
+                    f"ChirpstackClient.list_users_for_tenant(): Failed to fetch full user for id={getattr(user_item, 'id', '')} - {e.code()} {e.details()}"
+                )
+                continue
         return users
 
     def create_user_standalone(self, user: User) -> None:
@@ -2340,10 +2435,26 @@ class ChirpstackClient:
         -------
         - List of User objects.
         """
-        api_response = self._list_with_pagination("UserService", {}, "ListUsersRequest", "result")
+        # First list the User summary items
+        list_response = self._list_with_pagination("UserService", {}, "ListUsersRequest", "result")
         users = []
-        for user_item in api_response:
-            users.append(User.from_grpc(user_item))
+        
+        # For each summary item, fetch the full User using Get
+        for user_item in list_response:
+            try:
+                get_resp = self._call_rpc(
+                    "UserService",
+                    "Get",
+                    request_type="GetUserRequest",
+                    params={"id": getattr(user_item, "id", "")}
+                )
+                if get_resp and hasattr(get_resp, "user"):
+                    users.append(User.from_grpc(get_resp.user))
+            except grpc.RpcError as e:
+                logging.error(
+                    f"ChirpstackClient.list_users_standalone(): Failed to fetch full user for id={getattr(user_item, 'id', '')} - {e.code()} {e.details()}"
+                )
+                continue
         return users
 
     def update_user_password(self, user_id: str, password: str) -> None:
@@ -2489,32 +2600,29 @@ class ChirpstackClient:
         -------
         - List of MulticastGroup objects.
         """
-        api_response = self._list_with_pagination("MulticastGroupService", 
+        # First list the MulticastGroup summary items for this application
+        list_response = self._list_with_pagination("MulticastGroupService", 
                                                 {"application_id": application_id}, 
                                                 "ListMulticastGroupsRequest", 
                                                 "result")
         multicast_groups = []
-        for group_item in api_response:
-            # Import the enum here to avoid circular imports
-            from chirpstack_api_wrapper.objects import MulticastGroupType
-            
-            # Find the enum value by comparing the response value
-            group_type_enum = next((g for g in MulticastGroupType if g.value == group_item.group_type), MulticastGroupType.CLASS_C)
-            
-            multicast_group = MulticastGroup(
-                name=getattr(group_item, 'name', ''),
-                mc_addr=getattr(group_item, 'mc_addr', ''),
-                mc_nwk_s_key=getattr(group_item, 'mc_nwk_s_key', ''),
-                mc_app_s_key=getattr(group_item, 'mc_app_s_key', ''),
-                f_cnt=getattr(group_item, 'f_cnt', ''),
-                group_type=group_type_enum,
-                mc_timeout=getattr(group_item, 'mc_timeout', ''),
-                application_id=getattr(group_item, 'application_id', ''),
-                id=getattr(group_item, 'id', ''),
-                description=getattr(group_item, 'description', ''),
-                tags=dict(getattr(group_item, 'tags', {}))
-            )
-            multicast_groups.append(multicast_group)
+        
+        # For each summary item, fetch the full MulticastGroup using Get
+        for group_item in list_response:
+            try:
+                get_resp = self._call_rpc(
+                    "MulticastGroupService",
+                    "Get",
+                    request_type="GetMulticastGroupRequest",
+                    params={"id": getattr(group_item, "id", "")}
+                )
+                if get_resp and hasattr(get_resp, "multicast_group"):
+                    multicast_groups.append(MulticastGroup.from_grpc(get_resp.multicast_group))
+            except grpc.RpcError as e:
+                logging.error(
+                    f"ChirpstackClient.list_multicast_groups(): Failed to fetch full multicast group for id={getattr(group_item, 'id', '')} - {e.code()} {e.details()}"
+                )
+                continue
         return multicast_groups
 
     def add_device_to_multicast_group(self, multicast_group_id: str, dev_eui: str) -> None:
@@ -2766,38 +2874,29 @@ class ChirpstackClient:
         -------
         - List of FuotaDeployment objects.
         """
-        api_response = self._list_with_pagination("FuotaService", 
+        # First list the FuotaDeployment summary items for this application
+        list_response = self._list_with_pagination("FuotaService", 
                                                 {"application_id": application_id}, 
                                                 "ListFuotaDeploymentsRequest", 
                                                 "result")
         fuota_deployments = []
-        for deployment_item in api_response:
-            # Import the enum here to avoid circular imports
-            from chirpstack_api_wrapper.objects import MulticastGroupType
-            
-            # Find the enum values by comparing the response values
-            multicast_group_type_enum = next((m for m in MulticastGroupType if m.value == deployment_item.multicast_group_type), MulticastGroupType.CLASS_C)
-            group_type_enum = next((g for g in MulticastGroupType if g.value == deployment_item.group_type), MulticastGroupType.CLASS_C)
-            
-            fuota_deployment = FuotaDeployment(
-                name=getattr(deployment_item, 'name', ''),
-                application_id=getattr(deployment_item, 'application_id', ''),
-                device_profile_id=getattr(deployment_item, 'device_profile_id', ''),
-                multicast_group_id=getattr(deployment_item, 'multicast_group_id', ''),
-                multicast_group_type=multicast_group_type_enum,
-                mc_addr=getattr(deployment_item, 'mc_addr', ''),
-                mc_nwk_s_key=getattr(deployment_item, 'mc_nwk_s_key', ''),
-                mc_app_s_key=getattr(deployment_item, 'mc_app_s_key', ''),
-                f_cnt=getattr(deployment_item, 'f_cnt', ''),
-                group_type=group_type_enum,
-                dr=getattr(deployment_item, 'dr', ''),
-                frequency=getattr(deployment_item, 'frequency', ''),
-                class_c_timeout=getattr(deployment_item, 'class_c_timeout', ''),
-                id=getattr(deployment_item, 'id', ''),
-                description=getattr(deployment_item, 'description', ''),
-                tags=dict(getattr(deployment_item, 'tags', {}))
-            )
-            fuota_deployments.append(fuota_deployment)
+        
+        # For each summary item, fetch the full FuotaDeployment using Get
+        for deployment_item in list_response:
+            try:
+                get_resp = self._call_rpc(
+                    "FuotaService",
+                    "GetDeployment",
+                    request_type="GetFuotaDeploymentRequest",
+                    params={"id": getattr(deployment_item, "id", "")}
+                )
+                if get_resp and hasattr(get_resp, "deployment"):
+                    fuota_deployments.append(FuotaDeployment.from_grpc(get_resp.deployment))
+            except grpc.RpcError as e:
+                logging.error(
+                    f"ChirpstackClient.list_fuota_deployments(): Failed to fetch full deployment for id={getattr(deployment_item, 'id', '')} - {e.code()} {e.details()}"
+                )
+                continue
         return fuota_deployments
 
     def start_fuota_deployment(self, deployment_id: str) -> None:
@@ -3088,36 +3187,26 @@ class ChirpstackClient:
         -------
         - List of DeviceProfileTemplate objects.
         """
-        api_response = self._list_with_pagination("DeviceProfileTemplateService", {}, "ListDeviceProfileTemplatesRequest", "result")
+        # First list the DeviceProfileTemplate summary items
+        list_response = self._list_with_pagination("DeviceProfileTemplateService", {}, "ListDeviceProfileTemplatesRequest", "result")
         templates = []
-        for template_item in api_response:
-            # Import the enums here to avoid circular imports
-            from chirpstack_api_wrapper.objects import Region, MacVersion, RegParamsRevision, CodecRuntime
-            
-            # Find the enum values by comparing the response values
-            region_enum = next((r for r in Region if r.value == template_item.region), Region.EU868)
-            mac_version_enum = next((m for m in MacVersion if m.value == template_item.mac_version), MacVersion.LORAWAN_1_0_0)
-            reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == template_item.reg_params_revision), RegParamsRevision.A)
-            payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == template_item.payload_codec_runtime), CodecRuntime.NONE)
-            
-            template = DeviceProfileTemplate(
-                name=getattr(template_item, 'name', ''),
-                vendor=getattr(template_item, 'vendor', ''),
-                firmware=getattr(template_item, 'firmware', ''),
-                region=region_enum,
-                mac_version=mac_version_enum,
-                reg_params_revision=reg_params_revision_enum,
-                adr_algorithm_id=getattr(template_item, 'adr_algorithm_id', ''),
-                payload_codec_runtime=payload_codec_runtime_enum,
-                uplink_interval=getattr(template_item, 'uplink_interval', 0),
-                supports_otaa=getattr(template_item, 'supports_otaa', False),
-                supports_class_b=getattr(template_item, 'supports_class_b', False),
-                supports_class_c=getattr(template_item, 'supports_class_c', False),
-                id=getattr(template_item, 'id', ''),
-                description=getattr(template_item, 'description', ''),
-                tags=dict(getattr(template_item, 'tags', {}))
-            )
-            templates.append(template)
+        
+        # For each summary item, fetch the full DeviceProfileTemplate using Get
+        for template_item in list_response:
+            try:
+                get_resp = self._call_rpc(
+                    "DeviceProfileTemplateService",
+                    "Get",
+                    request_type="GetDeviceProfileTemplateRequest",
+                    params={"id": getattr(template_item, "id", "")}
+                )
+                if get_resp and hasattr(get_resp, "device_profile_template"):
+                    templates.append(DeviceProfileTemplate.from_grpc(get_resp.device_profile_template))
+            except grpc.RpcError as e:
+                logging.error(
+                    f"ChirpstackClient.list_device_profile_templates(): Failed to fetch full template for id={getattr(template_item, 'id', '')} - {e.code()} {e.details()}"
+                )
+                continue
         return templates
 
     def create_relay(self, relay: Relay) -> None:
@@ -3227,21 +3316,29 @@ class ChirpstackClient:
         -------
         - List of Relay objects.
         """
-        api_response = self._list_with_pagination("RelayService", 
+        # First list the Relay summary items for this tenant
+        list_response = self._list_with_pagination("RelayService", 
                                                 {"tenant_id": tenant_id}, 
                                                 "ListRelaysRequest", 
                                                 "result")
         relays = []
-        for relay_item in api_response:
-            relay = Relay(
-                name=getattr(relay_item, 'name', ''),
-                tenant_id=getattr(relay_item, 'tenant_id', ''),
-                device_id=getattr(relay_item, 'device_id', ''),
-                id=getattr(relay_item, 'id', ''),
-                description=getattr(relay_item, 'description', ''),
-                tags=dict(getattr(relay_item, 'tags', {}))
-            )
-            relays.append(relay)
+        
+        # For each summary item, fetch the full Relay using Get
+        for relay_item in list_response:
+            try:
+                get_resp = self._call_rpc(
+                    "RelayService",
+                    "Get",
+                    request_type="GetRelayRequest",
+                    params={"id": getattr(relay_item, "id", "")}
+                )
+                if get_resp and hasattr(get_resp, "relay"):
+                    relays.append(Relay.from_grpc(get_resp.relay))
+            except grpc.RpcError as e:
+                logging.error(
+                    f"ChirpstackClient.list_relays(): Failed to fetch full relay for id={getattr(relay_item, 'id', '')} - {e.code()} {e.details()}"
+                )
+                continue
         return relays
 
     def list_relay_devices(self, relay_id: str) -> list[dict]:
@@ -3343,11 +3440,66 @@ class ChirpstackClient:
         """
         device_profiles = []
         for tenant in tenants:
-            api_response = self._list_with_pagination(
+            # First list the DeviceProfile summary items for this tenant
+            list_response = self._list_with_pagination(
                 "DeviceProfileService",
                 {"tenant_id": tenant.id},
                 "ListDeviceProfilesRequest"
             )
-            for device_profile_item in api_response:
-                device_profiles.append(DeviceProfile.from_grpc(device_profile_item))
+
+            # For each summary item, fetch the full DeviceProfile using Get
+            for profile_item in list_response:
+                try:
+                    get_resp = self._call_rpc(
+                        "DeviceProfileService",
+                        "Get",
+                        request_type="GetDeviceProfileRequest",
+                        params={"id": getattr(profile_item, "id", "")}
+                    )
+                    if get_resp and hasattr(get_resp, "device_profile"):
+                        device_profiles.append(DeviceProfile.from_grpc(get_resp.device_profile))
+                except grpc.RpcError as e:
+                    logging.error(
+                        f"ChirpstackClient.list_all_device_profiles(): Failed to fetch full profile for id={getattr(profile_item, 'id', '')} - {e.code()} {e.details()}"
+                    )
+                    continue
         return device_profiles
+    
+    def list_all_gateways(self, tenants: list[Tenant]) -> list[Gateway]:
+        """
+        List all gateways.
+
+        Parameters
+        ----------
+        - tenants: List of Tenant objects from ChirpstackClient.list_all_tenants().
+
+        Returns
+        -------
+        - List of Gateway objects.
+        """
+        gateways = []
+        for tenant in tenants:
+            # First list the Gateway summary items for this tenant
+            list_response = self._list_with_pagination(
+                "GatewayService",
+                {"tenant_id": tenant.id},
+                "ListGatewaysRequest"
+            )
+            
+            # For each summary item, fetch the full Gateway using Get
+            for gateway_item in list_response:
+                try:
+                    get_resp = self._call_rpc(
+                        "GatewayService",
+                        "Get",
+                        request_type="GetGatewayRequest",
+                        params={"gateway_id": getattr(gateway_item, "gateway_id", "")}
+                    )
+                    if get_resp and hasattr(get_resp, "gateway"):
+                        gateways.append(Gateway.from_grpc(get_resp.gateway))
+                except grpc.RpcError as e:
+                    logging.error(
+                        f"ChirpstackClient.list_all_gateways(): Failed to fetch full gateway for gateway_id={getattr(gateway_item, 'gateway_id', '')} - {e.code()} {e.details()}"
+                    )
+                    continue
+        return gateways

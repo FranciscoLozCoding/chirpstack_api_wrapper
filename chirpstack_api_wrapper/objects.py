@@ -181,6 +181,68 @@ class Ts005Version(Enum):
     V1_0 = 0
     V1_1 = 1
 
+class AppLayerParams:
+    """
+    Definition of Application Layer Parameters Object for Chirpstack.
+    
+    This object contains the application layer parameters for device profiles,
+    including TS003, TS004, and TS005 version configurations with their
+    corresponding F-Port assignments.
+    
+    Params:
+    - ts003_version: TS003 version (Ts003Version enum).
+    - ts003_f_port: TS003 F-Port number.
+    - ts004_version: TS004 version (Ts004Version enum).
+    - ts004_f_port: TS004 F-Port number.
+    - ts005_version: TS005 version (Ts005Version enum).
+    - ts005_f_port: TS005 F-Port number.
+    """
+    def __init__(self, ts003_version: Ts003Version = Ts003Version.V1_0, ts003_f_port: int = 0,
+                 ts004_version: Ts004Version = Ts004Version.V1_0, ts004_f_port: int = 0,
+                 ts005_version: Ts005Version = Ts005Version.V1_0, ts005_f_port: int = 0):
+        self.ts003_version = ts003_version.value
+        self.ts003_f_port = ts003_f_port
+        self.ts004_version = ts004_version.value
+        self.ts004_f_port = ts004_f_port
+        self.ts005_version = ts005_version.value
+        self.ts005_f_port = ts005_f_port
+
+    @classmethod
+    def from_grpc(cls, grpc_app_layer_params):
+        """Convert gRPC AppLayerParams object to AppLayerParams object."""
+        
+        # Find the enum values by comparing the response values
+        ts003_version_enum = next((t for t in Ts003Version if t.value == getattr(grpc_app_layer_params, 'ts003_version', 0)), Ts003Version.V1_0)
+        ts004_version_enum = next((t for t in Ts004Version if t.value == getattr(grpc_app_layer_params, 'ts004_version', 0)), Ts004Version.V1_0)
+        ts005_version_enum = next((t for t in Ts005Version if t.value == getattr(grpc_app_layer_params, 'ts005_version', 0)), Ts005Version.V1_0)
+        
+        return cls(
+            ts003_version=ts003_version_enum,
+            ts003_f_port=getattr(grpc_app_layer_params, 'ts003_f_port', 0),
+            ts004_version=ts004_version_enum,
+            ts004_f_port=getattr(grpc_app_layer_params, 'ts004_f_port', 0),
+            ts005_version=ts005_version_enum,
+            ts005_f_port=getattr(grpc_app_layer_params, 'ts005_f_port', 0)
+        )
+
+    def __str__(self):
+        """String representation of the AppLayerParams object."""
+        return f"TS003:{self.ts003_version}(F{self.ts003_f_port}), TS004:{self.ts004_version}(F{self.ts004_f_port}), TS005:{self.ts005_version}(F{self.ts005_f_port})"
+    
+    def __repr__(self):
+        return str(self.to_dict())
+    
+    def to_dict(self) -> dict:
+        """Convert AppLayerParams object to dictionary."""
+        return {
+            'ts003_version': self.ts003_version,
+            'ts003_f_port': self.ts003_f_port,
+            'ts004_version': self.ts004_version,
+            'ts004_f_port': self.ts004_f_port,
+            'ts005_version': self.ts005_version,
+            'ts005_f_port': self.ts005_f_port
+        }
+
 class User:
     """
     Definition of User Object for Chirpstack.
@@ -216,6 +278,9 @@ class User:
     def __str__(self):
         return self.email
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert User object to dictionary."""
         return {
@@ -235,15 +300,27 @@ class Tenant:
     - name: Name of the tenant.
     - description: Description of the tenant.
     - id (optional): Unique identifier for the tenant.
+    - can_have_gateways (optional): Whether the tenant can have gateways.
+    - max_gateway_count (optional): Maximum number of gateways allowed for this tenant.
+    - max_device_count (optional): Maximum number of devices allowed for this tenant.
+    - private_gateways_up (optional): Whether the tenant has private gateways for uplink.
+    - private_gateways_down (optional): Whether the tenant has private gateways for downlink.
     - tags (dict<string,string>, optional): Additional metadata associated with the tenant.
     """
-    def __init__(self, name: str, description: str = '', id: str = '', tags: dict = {}):
+    def __init__(self, name: str, description: str = '', id: str = '', can_have_gateways: bool = False, 
+                 max_gateway_count: int = 0, max_device_count: int = 0, private_gateways_up: bool = False, 
+                 private_gateways_down: bool = False, tags: dict = {}):
         if not all(isinstance(value, str) for value in tags.values()):
             raise ValueError("Tenant: All values in 'tags' dictionary must be strings.")
         
         self.id = id
         self.name = name
         self.description = description
+        self.can_have_gateways = can_have_gateways
+        self.max_gateway_count = max_gateway_count
+        self.max_device_count = max_device_count
+        self.private_gateways_up = private_gateways_up
+        self.private_gateways_down = private_gateways_down
         self.tags = tags
 
     @classmethod
@@ -253,6 +330,11 @@ class Tenant:
             name=getattr(grpc_tenant, 'name', ''),
             description=getattr(grpc_tenant, 'description', ''),
             id=getattr(grpc_tenant, 'id', ''),
+            can_have_gateways=getattr(grpc_tenant, 'can_have_gateways', False),
+            max_gateway_count=getattr(grpc_tenant, 'max_gateway_count', 0),
+            max_device_count=getattr(grpc_tenant, 'max_device_count', 0),
+            private_gateways_up=getattr(grpc_tenant, 'private_gateways_up', False),
+            private_gateways_down=getattr(grpc_tenant, 'private_gateways_down', False),
             tags=dict(getattr(grpc_tenant, 'tags', {}))
         )
 
@@ -261,12 +343,20 @@ class Tenant:
             raise RuntimeError("Tenant: The id is empty, try creating the tenant first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert Tenant object to dictionary."""
         return {
             'id': self.id,
             'name': self.name,
             'description': self.description,
+            'can_have_gateways': self.can_have_gateways,
+            'max_gateway_count': self.max_gateway_count,
+            'max_device_count': self.max_device_count,
+            'private_gateways_up': self.private_gateways_up,
+            'private_gateways_down': self.private_gateways_down,
             'tags': self.tags
         }
 
@@ -310,6 +400,9 @@ class MulticastGroup:
             raise RuntimeError("MulticastGroup: The id is empty, try creating the group first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert MulticastGroup object to dictionary."""
         return {
@@ -325,6 +418,23 @@ class MulticastGroup:
             'description': self.description,
             'tags': self.tags
         }
+    
+    @classmethod
+    def from_grpc(cls, grpc_multicast_group):
+        """Convert gRPC MulticastGroup object to MulticastGroup object."""
+        return cls(
+            name=getattr(grpc_multicast_group, 'name', ''),
+            mc_addr=getattr(grpc_multicast_group, 'mc_addr', ''),
+            mc_nwk_s_key=getattr(grpc_multicast_group, 'mc_nwk_s_key', ''),
+            mc_app_s_key=getattr(grpc_multicast_group, 'mc_app_s_key', ''),
+            f_cnt=getattr(grpc_multicast_group, 'f_cnt', 0),
+            group_type=getattr(grpc_multicast_group, 'group_type', MulticastGroupType.CLASS_C),
+            mc_timeout=getattr(grpc_multicast_group, 'mc_timeout', 0),
+            application_id=getattr(grpc_multicast_group, 'application_id', ''),
+            id=getattr(grpc_multicast_group, 'id', ''),
+            description=getattr(grpc_multicast_group, 'description', ''),
+            tags=dict(getattr(grpc_multicast_group, 'tags', {}))
+        )
 
 class FuotaDeployment:
     """
@@ -377,6 +487,9 @@ class FuotaDeployment:
             raise RuntimeError("FuotaDeployment: The id is empty, try creating the deployment first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert FuotaDeployment object to dictionary."""
         return {
@@ -397,6 +510,28 @@ class FuotaDeployment:
             'description': self.description,
             'tags': self.tags
         }
+    
+    @classmethod
+    def from_grpc(cls, grpc_fuota_deployment):
+        """Convert gRPC FuotaDeployment object to FuotaDeployment object."""
+        return cls(
+            name=getattr(grpc_fuota_deployment, 'name', ''),
+            application_id=getattr(grpc_fuota_deployment, 'application_id', ''),
+            device_profile_id=getattr(grpc_fuota_deployment, 'device_profile_id', ''),
+            multicast_group_id=getattr(grpc_fuota_deployment, 'multicast_group_id', ''),
+            multicast_group_type=getattr(grpc_fuota_deployment, 'multicast_group_type', MulticastGroupType.CLASS_C),
+            mc_addr=getattr(grpc_fuota_deployment, 'mc_addr', ''),
+            mc_nwk_s_key=getattr(grpc_fuota_deployment, 'mc_nwk_s_key', ''),
+            mc_app_s_key=getattr(grpc_fuota_deployment, 'mc_app_s_key', ''),
+            f_cnt=getattr(grpc_fuota_deployment, 'f_cnt', 0),
+            group_type=getattr(grpc_fuota_deployment, 'group_type', MulticastGroupType.CLASS_C),
+            dr=getattr(grpc_fuota_deployment, 'dr', 0),
+            frequency=getattr(grpc_fuota_deployment, 'frequency', 0),
+            class_c_timeout=getattr(grpc_fuota_deployment, 'class_c_timeout', 0),
+            id=getattr(grpc_fuota_deployment, 'id', ''),
+            description=getattr(grpc_fuota_deployment, 'description', ''),
+            tags=dict(getattr(grpc_fuota_deployment, 'tags', {}))
+        )
 
 class DeviceProfileTemplate:
     """
@@ -447,6 +582,9 @@ class DeviceProfileTemplate:
             raise RuntimeError("DeviceProfileTemplate: The id is empty, try creating the template first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert DeviceProfileTemplate object to dictionary."""
         return {
@@ -466,6 +604,27 @@ class DeviceProfileTemplate:
             'description': self.description,
             'tags': self.tags
         }
+
+    @classmethod
+    def from_grpc(cls, grpc_device_profile_template):
+        """Convert gRPC DeviceProfileTemplate object to DeviceProfileTemplate object."""
+        return cls(
+            name=getattr(grpc_device_profile_template, 'name', ''),
+            vendor=getattr(grpc_device_profile_template, 'vendor', ''),
+            firmware=getattr(grpc_device_profile_template, 'firmware', ''),
+            region=getattr(grpc_device_profile_template, 'region', Region.EU868),
+            mac_version=getattr(grpc_device_profile_template, 'mac_version', MacVersion.LORAWAN_1_0_0),
+            reg_params_revision=getattr(grpc_device_profile_template, 'reg_params_revision', RegParamsRevision.A),
+            adr_algorithm_id=getattr(grpc_device_profile_template, 'adr_algorithm_id', ''),
+            payload_codec_runtime=getattr(grpc_device_profile_template, 'payload_codec_runtime', CodecRuntime.NONE),
+            uplink_interval=getattr(grpc_device_profile_template, 'uplink_interval', 0),
+            supports_otaa=getattr(grpc_device_profile_template, 'supports_otaa', False),
+            supports_class_b=getattr(grpc_device_profile_template, 'supports_class_b', False),
+            supports_class_c=getattr(grpc_device_profile_template, 'supports_class_c', False),
+            id=getattr(grpc_device_profile_template, 'id', ''),
+            description=getattr(grpc_device_profile_template, 'description', ''),
+            tags=dict(getattr(grpc_device_profile_template, 'tags', {}))
+        )
 
 class Relay:
     """
@@ -495,6 +654,9 @@ class Relay:
             raise RuntimeError("Relay: The id is empty, try creating the relay first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert Relay object to dictionary."""
         return {
@@ -505,6 +667,18 @@ class Relay:
             'description': self.description,
             'tags': self.tags
         }
+    
+    @classmethod
+    def from_grpc(cls, grpc_relay):
+        """Convert gRPC Relay object to Relay object."""
+        return cls(
+            name=getattr(grpc_relay, 'name', ''),
+            tenant_id=getattr(grpc_relay, 'tenant_id', ''),
+            device_id=getattr(grpc_relay, 'device_id', ''),
+            id=getattr(grpc_relay, 'id', ''),
+            description=getattr(grpc_relay, 'description', ''),
+            tags=dict(getattr(grpc_relay, 'tags', {}))
+        )
 
 # Integration objects
 class HttpIntegration:
@@ -527,16 +701,19 @@ class HttpIntegration:
     def from_grpc(cls, grpc_integration):
         """Convert gRPC HTTP integration object to HttpIntegration object."""
         return cls(
-            application_id=grpc_integration.application_id,
-            headers=dict(grpc_integration.headers),
-            url=grpc_integration.url,
-            id=grpc_integration.id
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            headers=dict(getattr(grpc_integration, 'headers', {})),
+            url=getattr(grpc_integration, 'url', ''),
+            id=getattr(grpc_integration, 'id', '')
         )
 
     def __str__(self):
         if self.id == "":
             raise RuntimeError("HttpIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
+    
+    def __repr__(self):
+        return str(self.to_dict())
     
     def to_dict(self) -> dict:
         """Convert HttpIntegration object to dictionary."""
@@ -577,6 +754,9 @@ class InfluxDbIntegration:
             raise RuntimeError("InfluxDbIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert InfluxDbIntegration object to dictionary."""
         return {
@@ -589,6 +769,20 @@ class InfluxDbIntegration:
             'version': self.version,
             'precision': self.precision
         }
+    
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC InfluxDB integration object to InfluxDbIntegration object."""
+        return cls(
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            endpoint=getattr(grpc_integration, 'endpoint', ''),
+            token=getattr(grpc_integration, 'token', ''),
+            organization=getattr(grpc_integration, 'organization', ''),
+            bucket=getattr(grpc_integration, 'bucket', ''),
+            version=getattr(grpc_integration, 'version', InfluxDbVersion.V1),
+            precision=getattr(grpc_integration, 'precision', InfluxDbPrecision.NS),
+            id=getattr(grpc_integration, 'id', '')
+        )
 
 class ThingsBoardIntegration:
     """
@@ -611,6 +805,9 @@ class ThingsBoardIntegration:
             raise RuntimeError("ThingsBoardIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert ThingsBoardIntegration object to dictionary."""
         return {
@@ -619,6 +816,16 @@ class ThingsBoardIntegration:
             'server': self.server,
             'token': self.token
         }
+    
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC ThingsBoard integration object to ThingsBoardIntegration object."""
+        return cls(
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            server=getattr(grpc_integration, 'server', ''),
+            token=getattr(grpc_integration, 'token', ''),
+            id=getattr(grpc_integration, 'id', '')
+        )
 
 class AwsSnsIntegration:
     """
@@ -646,6 +853,9 @@ class AwsSnsIntegration:
             raise RuntimeError("AwsSnsIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert AwsSnsIntegration object to dictionary."""
         return {
@@ -656,6 +866,18 @@ class AwsSnsIntegration:
             'aws_secret_access_key': self.aws_secret_access_key,
             'topic_arn': self.topic_arn
         }
+
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC AWS SNS integration object to AwsSnsIntegration object."""
+        return cls(
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            aws_region=getattr(grpc_integration, 'aws_region', ''),
+            aws_access_key_id=getattr(grpc_integration, 'aws_access_key_id', ''),
+            aws_secret_access_key=getattr(grpc_integration, 'aws_secret_access_key', ''),
+            topic_arn=getattr(grpc_integration, 'topic_arn', ''),
+            id=getattr(grpc_integration, 'id', '')
+        )
 
 class AzureServiceBusIntegration:
     """
@@ -678,6 +900,9 @@ class AzureServiceBusIntegration:
             raise RuntimeError("AzureServiceBusIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert AzureServiceBusIntegration object to dictionary."""
         return {
@@ -686,6 +911,16 @@ class AzureServiceBusIntegration:
             'connection_string': self.connection_string,
             'topic_name': self.topic_name
         }
+
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC Azure Service Bus integration object to AzureServiceBusIntegration object."""
+        return cls(
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            connection_string=getattr(grpc_integration, 'connection_string', ''),
+            topic_name=getattr(grpc_integration, 'topic_name', ''),
+            id=getattr(grpc_integration, 'id', '')
+        )
 
 class GcpPubSubIntegration:
     """
@@ -713,6 +948,9 @@ class GcpPubSubIntegration:
             raise RuntimeError("GcpPubSubIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert GcpPubSubIntegration object to dictionary."""
         return {
@@ -723,6 +961,18 @@ class GcpPubSubIntegration:
             'topic_name': self.topic_name,
             'service_account_key': self.service_account_key
         }
+
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC GCP Pub/Sub integration object to GcpPubSubIntegration object."""
+        return cls(
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            encoding=getattr(grpc_integration, 'encoding', Encoding.JSON),
+            project_id=getattr(grpc_integration, 'project_id', ''),
+            topic_name=getattr(grpc_integration, 'topic_name', ''),
+            service_account_key=getattr(grpc_integration, 'service_account_key', ''),
+            id=getattr(grpc_integration, 'id', '')
+        )
 
 class IftttIntegration:
     """
@@ -743,6 +993,9 @@ class IftttIntegration:
             raise RuntimeError("IftttIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert IftttIntegration object to dictionary."""
         return {
@@ -750,6 +1003,15 @@ class IftttIntegration:
             'application_id': self.application_id,
             'key': self.key
         }
+
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC IFTTT integration object to IftttIntegration object."""
+        return cls(
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            key=getattr(grpc_integration, 'key', ''),
+            id=getattr(grpc_integration, 'id', '')
+        )
 
 class MyDevicesIntegration:
     """
@@ -772,6 +1034,9 @@ class MyDevicesIntegration:
             raise RuntimeError("MyDevicesIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert MyDevicesIntegration object to dictionary."""
         return {
@@ -780,6 +1045,16 @@ class MyDevicesIntegration:
             'endpoint': self.endpoint,
             'token': self.token
         }
+
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC MyDevices integration object to MyDevicesIntegration object."""
+        return cls(
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            endpoint=getattr(grpc_integration, 'endpoint', ''),
+            token=getattr(grpc_integration, 'token', ''),
+            id=getattr(grpc_integration, 'id', '')
+        )
 
 class PilotThingsIntegration:
     """
@@ -802,6 +1077,9 @@ class PilotThingsIntegration:
             raise RuntimeError("PilotThingsIntegration: The id is empty, try creating the integration first in Chirpstack")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert PilotThingsIntegration object to dictionary."""
         return {
@@ -810,6 +1088,16 @@ class PilotThingsIntegration:
             'server': self.server,
             'token': self.token
         }
+
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC Pilot Things integration object to PilotThingsIntegration object."""
+        return cls(
+            application_id=getattr(grpc_integration, 'application_id', ''),
+            server=getattr(grpc_integration, 'server', ''),
+            token=getattr(grpc_integration, 'token', ''),
+            id=getattr(grpc_integration, 'id', '')
+        )
 
 class Location:
     """
@@ -832,6 +1120,9 @@ class Location:
     def __str__(self):
         return f"({self.latitude}, {self.longitude}, {self.altitude}m)"
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert Location object to dictionary."""
         return {
@@ -853,16 +1144,14 @@ class Gateway:
     - description (optional): Description of the gateway.
     - tags (dict<string,string>, optional): Additional metadata associated with the gateway.
     - stats_interval (optional): The expected interval in seconds in which the gateway sends its statistics (default is 30 sec).
-    - id (optional): Unique identifier for the gateway.
     - location (optional): Gateway location information (Location object or dict).
     - metadata (optional): Additional metadata for the gateway.
     """
-    def __init__(self,name:str,gateway_id:str,tenant_id:str,description:str='',tags:dict={},stats_interval:int=30,id:str='',location:Location|dict=None,metadata:dict=None):
+    def __init__(self,name:str,gateway_id:str,tenant_id:str,description:str='',tags:dict={},stats_interval:int=30,location:Location|dict=None,metadata:dict=None):
         """Constructor method to initialize a Gateway object."""            
         if not all(isinstance(value, str) for value in tags.values()):
             raise ValueError("Gateway: All values in 'tags' dictionary must be strings.")
 
-        self.id = id
         self.gateway_id = gateway_id
         self.name = name
         self.description = description
@@ -902,7 +1191,6 @@ class Gateway:
             description=getattr(grpc_gateway, 'description', ''),
             tags=dict(getattr(grpc_gateway, 'tags', {})),
             stats_interval=getattr(grpc_gateway, 'stats_interval', 30),
-            id=getattr(grpc_gateway, 'id', ''),
             location=location,
             metadata=dict(getattr(grpc_gateway, 'metadata', {}))
         )
@@ -911,10 +1199,12 @@ class Gateway:
         """String representation of the Gateway object"""
         return self.gateway_id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert Gateway object to dictionary."""
         return {
-            'id': self.id,
             'gateway_id': self.gateway_id,
             'name': self.name,
             'description': self.description,
@@ -966,6 +1256,9 @@ class Application:
             raise RuntimeError("Application: The id is empty, try creating the app first in Chirpstack using ChirpstackClient.create_app()")
         return self.id
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert Application object to dictionary."""
         return {
@@ -1013,7 +1306,7 @@ class DeviceProfile:
     - allow_roaming (optional): This allows the devices to use roaming. Roaming must also be configured in the server.
     - adr_algorithm_id (optional): The ADR algorithm that will be used for controlling the devices data-rate.
     - rx1_delay (optional): RX1 delay for OTAA devices.
-    - app_layer_params (optional): Application layer parameters.
+    - app_layer_params (optional): Application layer parameters (AppLayerParams object).
     - region_config_id (optional): Region configuration ID.
     - is_relay (optional): Whether this is a relay device profile.
     - is_relay_ed (optional): Whether this is a relay end-device profile.
@@ -1046,7 +1339,7 @@ class DeviceProfile:
         class_c_timeout:int=None,id:str="",description:str='',payload_codec_runtime:CodecRuntime=CodecRuntime.NONE,
         payload_codec_script:str="",flush_queue_on_activate:bool=True,device_status_req_interval:int=1,tags:dict={},
         auto_detect_measurements:bool=True,allow_roaming:bool=False,adr_algorithm_id:AdrAlgorithm=AdrAlgorithm.LORA_ONLY,
-        rx1_delay:int=None,app_layer_params:dict=None,region_config_id:str="",is_relay:bool=False,is_relay_ed:bool=False,
+        rx1_delay:int=None,app_layer_params:AppLayerParams=None,region_config_id:str="",is_relay:bool=False,is_relay_ed:bool=False,
         relay_ed_relay_only:bool=False,relay_enabled:bool=False,relay_cad_periodicity:CadPeriodicity=CadPeriodicity.NONE,
         relay_default_channel_index:int=None,relay_second_channel_freq:int=None,relay_second_channel_dr:int=None,
         relay_second_channel_ack_offset:SecondChAckOffset=SecondChAckOffset.NONE,relay_ed_activation_mode:RelayModeActivation=RelayModeActivation.DISABLED,
@@ -1089,7 +1382,7 @@ class DeviceProfile:
         self.allow_roaming = allow_roaming
         self.adr_algorithm_id = adr_algorithm_id.value
         self.rx1_delay = rx1_delay
-        self.app_layer_params = app_layer_params or {}
+        self.app_layer_params = app_layer_params if isinstance(app_layer_params, AppLayerParams) else AppLayerParams()
         self.region_config_id = region_config_id
         self.is_relay = is_relay
         self.is_relay_ed = is_relay_ed
@@ -1226,19 +1519,16 @@ class DeviceProfile:
     @classmethod
     def from_grpc(cls, grpc_device_profile):
         """Convert gRPC device profile object to DeviceProfile object."""
-        # Import the enums here to avoid circular imports
-        from chirpstack_api_wrapper.objects import Region, MacVersion, RegParamsRevision, CodecRuntime, AdrAlgorithm, ClassBPingSlot, CadPeriodicity, SecondChAckOffset, RelayModeActivation
-        
         # Find the enum values by comparing the response values
-        region_enum = next((r for r in Region if r.value == grpc_device_profile.region), Region.US915)
-        mac_version_enum = next((m for m in MacVersion if m.value == grpc_device_profile.mac_version), MacVersion.LORAWAN_1_0_0)
-        reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == grpc_device_profile.reg_params_revision), RegParamsRevision.A)
-        payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == grpc_device_profile.payload_codec_runtime), CodecRuntime.NONE)
-        adr_algorithm_enum = next((a for a in AdrAlgorithm if a.value == grpc_device_profile.adr_algorithm_id), AdrAlgorithm.LORA_ONLY)
-        class_b_ping_slot_periodicity_enum = next((c for c in ClassBPingSlot if c.value == grpc_device_profile.class_b_ping_slot_periodicity), ClassBPingSlot.NONE)
-        relay_cad_periodicity_enum = next((c for c in CadPeriodicity if c.value == grpc_device_profile.relay_cad_periodicity), CadPeriodicity.NONE)
-        relay_second_channel_ack_offset_enum = next((s for s in SecondChAckOffset if s.value == grpc_device_profile.relay_second_channel_ack_offset), SecondChAckOffset.NONE)
-        relay_ed_activation_mode_enum = next((r for r in RelayModeActivation if r.value == grpc_device_profile.relay_ed_activation_mode), RelayModeActivation.DISABLED)
+        region_enum = next((r for r in Region if r.value == getattr(grpc_device_profile, 'region', 0)), Region.US915)
+        mac_version_enum = next((m for m in MacVersion if m.value == getattr(grpc_device_profile, 'mac_version', 0)), MacVersion.LORAWAN_1_0_0)
+        reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == getattr(grpc_device_profile, 'reg_params_revision', 0)), RegParamsRevision.A)
+        payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == getattr(grpc_device_profile, 'payload_codec_runtime', 0)), CodecRuntime.NONE)
+        adr_algorithm_enum = next((a for a in AdrAlgorithm if a.value == getattr(grpc_device_profile, 'adr_algorithm_id', 'default')), AdrAlgorithm.LORA_ONLY)
+        class_b_ping_slot_periodicity_enum = next((c for c in ClassBPingSlot if c.value == getattr(grpc_device_profile, 'class_b_ping_slot_periodicity', None)), ClassBPingSlot.NONE)
+        relay_cad_periodicity_enum = next((c for c in CadPeriodicity if c.value == getattr(grpc_device_profile, 'relay_cad_periodicity', 0)), CadPeriodicity.NONE)
+        relay_second_channel_ack_offset_enum = next((s for s in SecondChAckOffset if s.value == getattr(grpc_device_profile, 'relay_second_channel_ack_offset', 0)), SecondChAckOffset.NONE)
+        relay_ed_activation_mode_enum = next((r for r in RelayModeActivation if r.value == getattr(grpc_device_profile, 'relay_ed_activation_mode', 0)), RelayModeActivation.DISABLED)
         
         return cls(
             name=getattr(grpc_device_profile, 'name', ''),
@@ -1255,7 +1545,7 @@ class DeviceProfile:
             abp_rx2_dr=getattr(grpc_device_profile, 'abp_rx2_dr', 0),
             abp_rx2_freq=getattr(grpc_device_profile, 'abp_rx2_freq', 0),
             class_b_timeout=getattr(grpc_device_profile, 'class_b_timeout', 0),
-            class_b_ping_slot_nb_k=class_b_ping_slot_periodicity_enum,
+            class_b_ping_slot_periodicity=class_b_ping_slot_periodicity_enum,
             class_b_ping_slot_dr=getattr(grpc_device_profile, 'class_b_ping_slot_dr', 0),
             class_b_ping_slot_freq=getattr(grpc_device_profile, 'class_b_ping_slot_freq', 0),
             class_c_timeout=getattr(grpc_device_profile, 'class_c_timeout', 0),
@@ -1270,7 +1560,7 @@ class DeviceProfile:
             allow_roaming=getattr(grpc_device_profile, 'allow_roaming', False),
             adr_algorithm_id=adr_algorithm_enum,
             rx1_delay=getattr(grpc_device_profile, 'rx1_delay', 0),
-            app_layer_params=dict(getattr(grpc_device_profile, 'app_layer_params', {})),
+            app_layer_params=AppLayerParams.from_grpc(getattr(grpc_device_profile, 'app_layer_params', None)) if hasattr(grpc_device_profile, 'app_layer_params') and grpc_device_profile.app_layer_params else AppLayerParams(),
             region_config_id=getattr(grpc_device_profile, 'region_config_id', ''),
             is_relay=getattr(grpc_device_profile, 'is_relay', False),
             is_relay_ed=getattr(grpc_device_profile, 'is_relay_ed', False),
@@ -1302,6 +1592,9 @@ class DeviceProfile:
         if self.id == "":
             raise RuntimeError("DeviceProfile: The id is empty, try creating the profile first in Chirpstack using ChirpstackClient.create_device_profile()")
         return self.id
+    
+    def __repr__(self):
+        return str(self.to_dict())
     
     def to_dict(self) -> dict:
         """Convert DeviceProfile object to dictionary."""
@@ -1335,7 +1628,7 @@ class DeviceProfile:
             'allow_roaming': self.allow_roaming,
             'adr_algorithm_id': self.adr_algorithm_id,
             'rx1_delay': self.rx1_delay,
-            'app_layer_params': self.app_layer_params,
+            'app_layer_params': self.app_layer_params.to_dict() if isinstance(self.app_layer_params, AppLayerParams) else self.app_layer_params,
             'region_config_id': self.region_config_id,
             'is_relay': self.is_relay,
             'is_relay_ed': self.is_relay_ed,
@@ -1424,6 +1717,9 @@ class Device:
         """String representation of the Device object"""
         return self.dev_eui
     
+    def __repr__(self):
+        return str(self.to_dict())
+    
     def to_dict(self) -> dict:
         """Convert Device object to dictionary."""
         return {
@@ -1462,4 +1758,74 @@ class DeviceKeys:
             'dev_eui': self.dev_eui,
             'nwk_key': self.nwk_key,
             'app_key': self.app_key
+        }
+    
+    def __repr__(self):
+        return str(self.to_dict())
+
+class DeviceActivation:
+    """
+    Definition of Device Activation Object for Chirpstack.
+    
+    This object contains the activation details for a device, including
+    device address, session keys, and frame counters for both OTAA and ABP activations.
+    
+    Params:
+    - dev_eui: Device EUI (64-bit identifier).
+    - dev_addr: Device address (32-bit identifier).
+    - app_s_key: Application session key (128-bit key).
+    - nwk_s_enc_key: Network session encryption key (128-bit key).
+    - s_nwk_s_int_key: Serving network session integrity key (128-bit key).
+    - f_nwk_s_int_key: Forwarding network session integrity key (128-bit key).
+    - f_cnt_up: Frame counter up (32-bit counter).
+    - n_f_cnt_down: Network frame counter down (32-bit counter).
+    - a_f_cnt_down: Application frame counter down (32-bit counter).
+    """
+    def __init__(self, dev_eui: str, dev_addr: str, app_s_key: str, nwk_s_enc_key: str,
+                 s_nwk_s_int_key: str, f_nwk_s_int_key: str, f_cnt_up: int = 0,
+                 n_f_cnt_down: int = 0, a_f_cnt_down: int = 0):
+        self.dev_eui = dev_eui
+        self.dev_addr = dev_addr
+        self.app_s_key = app_s_key
+        self.nwk_s_enc_key = nwk_s_enc_key
+        self.s_nwk_s_int_key = s_nwk_s_int_key
+        self.f_nwk_s_int_key = f_nwk_s_int_key
+        self.f_cnt_up = f_cnt_up
+        self.n_f_cnt_down = n_f_cnt_down
+        self.a_f_cnt_down = a_f_cnt_down
+
+    @classmethod
+    def from_grpc(cls, grpc_device_activation):
+        """Convert gRPC DeviceActivation object to DeviceActivation object."""
+        return cls(
+            dev_eui=getattr(grpc_device_activation, 'dev_eui', ''),
+            dev_addr=getattr(grpc_device_activation, 'dev_addr', ''),
+            app_s_key=getattr(grpc_device_activation, 'app_s_key', ''),
+            nwk_s_enc_key=getattr(grpc_device_activation, 'nwk_s_enc_key', ''),
+            s_nwk_s_int_key=getattr(grpc_device_activation, 's_nwk_s_int_key', ''),
+            f_nwk_s_int_key=getattr(grpc_device_activation, 'f_nwk_s_int_key', ''),
+            f_cnt_up=getattr(grpc_device_activation, 'f_cnt_up', 0),
+            n_f_cnt_down=getattr(grpc_device_activation, 'n_f_cnt_down', 0),
+            a_f_cnt_down=getattr(grpc_device_activation, 'a_f_cnt_down', 0)
+        )
+
+    def __str__(self):
+        """String representation of the DeviceActivation object."""
+        return f"DeviceActivation(dev_eui={self.dev_eui}, dev_addr={self.dev_addr})"
+    
+    def __repr__(self):
+        return str(self.to_dict())
+    
+    def to_dict(self) -> dict:
+        """Convert DeviceActivation object to dictionary."""
+        return {
+            'dev_eui': self.dev_eui,
+            'dev_addr': self.dev_addr,
+            'app_s_key': self.app_s_key,
+            'nwk_s_enc_key': self.nwk_s_enc_key,
+            's_nwk_s_int_key': self.s_nwk_s_int_key,
+            'f_nwk_s_int_key': self.f_nwk_s_int_key,
+            'f_cnt_up': self.f_cnt_up,
+            'n_f_cnt_down': self.n_f_cnt_down,
+            'a_f_cnt_down': self.a_f_cnt_down
         }

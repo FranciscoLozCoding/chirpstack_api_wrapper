@@ -201,6 +201,18 @@ class User:
         self.is_admin = is_admin
         self.note = note
 
+    @classmethod
+    def from_grpc(cls, grpc_user):
+        """Convert gRPC user object to User object."""
+        return cls(
+            email=getattr(grpc_user, 'email', ''),
+            password="",  # Password is not returned by the API
+            is_active=getattr(grpc_user, 'is_active', True),
+            is_admin=getattr(grpc_user, 'is_admin', False),
+            note=getattr(grpc_user, 'note', ''),
+            id=getattr(grpc_user, 'id', '')
+        )
+
     def __str__(self):
         return self.email
     
@@ -233,6 +245,16 @@ class Tenant:
         self.name = name
         self.description = description
         self.tags = tags
+
+    @classmethod
+    def from_grpc(cls, grpc_tenant):
+        """Convert gRPC tenant object to Tenant object."""
+        return cls(
+            name=getattr(grpc_tenant, 'name', ''),
+            description=getattr(grpc_tenant, 'description', ''),
+            id=getattr(grpc_tenant, 'id', ''),
+            tags=dict(getattr(grpc_tenant, 'tags', {}))
+        )
 
     def __str__(self):
         if self.id == "":
@@ -500,6 +522,16 @@ class HttpIntegration:
         self.application_id = application_id
         self.headers = headers
         self.url = url
+
+    @classmethod
+    def from_grpc(cls, grpc_integration):
+        """Convert gRPC HTTP integration object to HttpIntegration object."""
+        return cls(
+            application_id=grpc_integration.application_id,
+            headers=dict(grpc_integration.headers),
+            url=grpc_integration.url,
+            id=grpc_integration.id
+        )
 
     def __str__(self):
         if self.id == "":
@@ -848,6 +880,32 @@ class Gateway:
         else:
             self.location = location or {}
         self.metadata = metadata or {}
+
+    @classmethod
+    def from_grpc(cls, grpc_gateway):
+        """Convert gRPC gateway object to Gateway object."""
+        # Create Location object if location data exists
+        location = None
+        if hasattr(grpc_gateway, 'location') and grpc_gateway.location:
+            location = Location(
+                latitude=getattr(grpc_gateway.location, 'latitude', 0.0),
+                longitude=getattr(grpc_gateway.location, 'longitude', 0.0),
+                altitude=getattr(grpc_gateway.location, 'altitude', 0.0),
+                source=getattr(grpc_gateway.location, 'source', 'UNKNOWN'),
+                accuracy=getattr(grpc_gateway.location, 'accuracy', 0.0)
+            )
+        
+        return cls(
+            name=getattr(grpc_gateway, 'name', ''),
+            gateway_id=getattr(grpc_gateway, 'gateway_id', ''),
+            tenant_id=getattr(grpc_gateway, 'tenant_id', ''),
+            description=getattr(grpc_gateway, 'description', ''),
+            tags=dict(getattr(grpc_gateway, 'tags', {})),
+            stats_interval=getattr(grpc_gateway, 'stats_interval', 30),
+            id=getattr(grpc_gateway, 'id', ''),
+            location=location,
+            metadata=dict(getattr(grpc_gateway, 'metadata', {}))
+        )
     
     def __str__(self):
         """String representation of the Gateway object"""
@@ -890,6 +948,17 @@ class Application:
         self.tenant_id = tenant_id
         self.description = description
         self.tags = tags
+
+    @classmethod
+    def from_grpc(cls, grpc_application):
+        """Convert gRPC application object to Application object."""
+        return cls(
+            name=getattr(grpc_application, 'name', ''),
+            tenant_id=getattr(grpc_application, 'tenant_id', ''),
+            id=getattr(grpc_application, 'id', ''),
+            description=getattr(grpc_application, 'description', ''),
+            tags=dict(getattr(grpc_application, 'tags', {}))
+        )
 
     def __str__(self):
         """String representation of the application object"""
@@ -1154,6 +1223,80 @@ class DeviceProfile:
             raise ValueError("DeviceProfile: class_c_timeout is required when supports_class_c is True")
         self._class_c_timeout = value
 
+    @classmethod
+    def from_grpc(cls, grpc_device_profile):
+        """Convert gRPC device profile object to DeviceProfile object."""
+        # Import the enums here to avoid circular imports
+        from chirpstack_api_wrapper.objects import Region, MacVersion, RegParamsRevision, CodecRuntime, AdrAlgorithm, ClassBPingSlot, CadPeriodicity, SecondChAckOffset, RelayModeActivation
+        
+        # Find the enum values by comparing the response values
+        region_enum = next((r for r in Region if r.value == grpc_device_profile.region), Region.US915)
+        mac_version_enum = next((m for m in MacVersion if m.value == grpc_device_profile.mac_version), MacVersion.LORAWAN_1_0_0)
+        reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == grpc_device_profile.reg_params_revision), RegParamsRevision.A)
+        payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == grpc_device_profile.payload_codec_runtime), CodecRuntime.NONE)
+        adr_algorithm_enum = next((a for a in AdrAlgorithm if a.value == grpc_device_profile.adr_algorithm_id), AdrAlgorithm.LORA_ONLY)
+        class_b_ping_slot_nb_k_enum = next((c for c in ClassBPingSlot if c.value == grpc_device_profile.class_b_ping_slot_periodicity), ClassBPingSlot.NONE)
+        relay_cad_periodicity_enum = next((c for c in CadPeriodicity if c.value == grpc_device_profile.relay_cad_periodicity), CadPeriodicity.NONE)
+        relay_second_channel_ack_offset_enum = next((s for s in SecondChAckOffset if s.value == grpc_device_profile.relay_second_channel_ack_offset), SecondChAckOffset.NONE)
+        relay_ed_activation_mode_enum = next((r for r in RelayModeActivation if r.value == grpc_device_profile.relay_ed_activation_mode), RelayModeActivation.DISABLED)
+        
+        return cls(
+            name=getattr(grpc_device_profile, 'name', ''),
+            tenant_id=getattr(grpc_device_profile, 'tenant_id', ''),
+            region=region_enum,
+            mac_version=mac_version_enum,
+            reg_params_revision=reg_params_revision_enum,
+            uplink_interval=getattr(grpc_device_profile, 'uplink_interval', 0),
+            supports_otaa=getattr(grpc_device_profile, 'supports_otaa', False),
+            supports_class_b=getattr(grpc_device_profile, 'supports_class_b', False),
+            supports_class_c=getattr(grpc_device_profile, 'supports_class_c', False),
+            abp_rx1_delay=getattr(grpc_device_profile, 'abp_rx1_delay', 0),
+            abp_rx1_dr_offset=getattr(grpc_device_profile, 'abp_rx1_dr_offset', 0),
+            abp_rx2_dr=getattr(grpc_device_profile, 'abp_rx2_dr', 0),
+            abp_rx2_freq=getattr(grpc_device_profile, 'abp_rx2_freq', 0),
+            class_b_timeout=getattr(grpc_device_profile, 'class_b_timeout', 0),
+            class_b_ping_slot_nb_k=class_b_ping_slot_nb_k_enum,
+            class_b_ping_slot_dr=getattr(grpc_device_profile, 'class_b_ping_slot_dr', 0),
+            class_b_ping_slot_freq=getattr(grpc_device_profile, 'class_b_ping_slot_freq', 0),
+            class_c_timeout=getattr(grpc_device_profile, 'class_c_timeout', 0),
+            id=getattr(grpc_device_profile, 'id', ''),
+            description=getattr(grpc_device_profile, 'description', ''),
+            payload_codec_runtime=payload_codec_runtime_enum,
+            payload_codec_script=getattr(grpc_device_profile, 'payload_codec_script', ''),
+            flush_queue_on_activate=getattr(grpc_device_profile, 'flush_queue_on_activate', False),
+            device_status_req_interval=getattr(grpc_device_profile, 'device_status_req_interval', 0),
+            tags=dict(getattr(grpc_device_profile, 'tags', {})),
+            auto_detect_measurements=getattr(grpc_device_profile, 'auto_detect_measurements', False),
+            allow_roaming=getattr(grpc_device_profile, 'allow_roaming', False),
+            adr_algorithm_id=adr_algorithm_enum,
+            rx1_delay=getattr(grpc_device_profile, 'rx1_delay', 0),
+            app_layer_params=dict(getattr(grpc_device_profile, 'app_layer_params', {})),
+            region_config_id=getattr(grpc_device_profile, 'region_config_id', ''),
+            is_relay=getattr(grpc_device_profile, 'is_relay', False),
+            is_relay_ed=getattr(grpc_device_profile, 'is_relay_ed', False),
+            relay_ed_relay_only=getattr(grpc_device_profile, 'relay_ed_relay_only', False),
+            relay_enabled=getattr(grpc_device_profile, 'relay_enabled', False),
+            relay_cad_periodicity=relay_cad_periodicity_enum,
+            relay_default_channel_index=getattr(grpc_device_profile, 'relay_default_channel_index', 0),
+            relay_second_channel_freq=getattr(grpc_device_profile, 'relay_second_channel_freq', 0),
+            relay_second_channel_dr=getattr(grpc_device_profile, 'relay_second_channel_dr', 0),
+            relay_second_channel_ack_offset=relay_second_channel_ack_offset_enum,
+            relay_ed_activation_mode=relay_ed_activation_mode_enum,
+            relay_ed_smart_enable_level=getattr(grpc_device_profile, 'relay_ed_smart_enable_level', 0),
+            relay_ed_back_off=getattr(grpc_device_profile, 'relay_ed_back_off', 0),
+            relay_ed_uplink_limit_bucket_size=getattr(grpc_device_profile, 'relay_ed_uplink_limit_bucket_size', 0),
+            relay_ed_uplink_limit_reload_rate=getattr(grpc_device_profile, 'relay_ed_uplink_limit_reload_rate', 0),
+            relay_join_req_limit_reload_rate=getattr(grpc_device_profile, 'relay_join_req_limit_reload_rate', 0),
+            relay_notify_limit_reload_rate=getattr(grpc_device_profile, 'relay_notify_limit_reload_rate', 0),
+            relay_global_uplink_limit_reload_rate=getattr(grpc_device_profile, 'relay_global_uplink_limit_reload_rate', 0),
+            relay_overall_limit_reload_rate=getattr(grpc_device_profile, 'relay_overall_limit_reload_rate', 0),
+            relay_join_req_limit_bucket_size=getattr(grpc_device_profile, 'relay_join_req_limit_bucket_size', 0),
+            relay_notify_limit_bucket_size=getattr(grpc_device_profile, 'relay_notify_limit_bucket_size', 0),
+            relay_global_uplink_limit_bucket_size=getattr(grpc_device_profile, 'relay_global_uplink_limit_bucket_size', 0),
+            relay_overall_limit_bucket_size=getattr(grpc_device_profile, 'relay_overall_limit_bucket_size', 0),
+            measurements=dict(getattr(grpc_device_profile, 'measurements', {}))
+        )
+
     def __str__(self):
         """String representation of the Device Profile object"""
         if self.id == "":
@@ -1260,6 +1403,22 @@ class Device:
         self.is_disabled = is_disabled
         self.tags = tags
         self.variables = variables
+
+    @classmethod
+    def from_grpc(cls, grpc_device):
+        """Convert gRPC device object to Device object."""
+        return cls(
+            name=getattr(grpc_device, 'name', ''),
+            dev_eui=getattr(grpc_device, 'dev_eui', ''),
+            application_id=getattr(grpc_device, 'application_id', ''),
+            device_profile_id=getattr(grpc_device, 'device_profile_id', ''),
+            join_eui=getattr(grpc_device, 'join_eui', ''),
+            description=getattr(grpc_device, 'description', ''),
+            skip_fcnt_check=getattr(grpc_device, 'skip_fcnt_check', False),
+            is_disabled=getattr(grpc_device, 'is_disabled', False),
+            tags=dict(getattr(grpc_device, 'tags', {})),
+            variables=dict(getattr(grpc_device, 'variables', {}))
+        )
 
     def __str__(self):
         """String representation of the Device object"""

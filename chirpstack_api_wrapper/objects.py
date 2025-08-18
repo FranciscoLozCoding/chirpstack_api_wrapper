@@ -349,9 +349,9 @@ class Tenant:
     def to_dict(self) -> dict:
         """Convert Tenant object to dictionary."""
         return {
-            'id': self.id,
             'name': self.name,
             'description': self.description,
+            'id': self.id,
             'can_have_gateways': self.can_have_gateways,
             'max_gateway_count': self.max_gateway_count,
             'max_device_count': self.max_device_count,

@@ -996,7 +996,7 @@ class DeviceProfile:
     - abp_rx2_dr (required if not supports_otaa): The devices' RX2 DR (for ABP).
     - abp_rx2_freq (required if not supports_otaa): The devices' RX2 frequency (for ABP, Hz).
     - class_b_timeout (required if supports_class_b): The devices' Class-B timeout in seconds for confirmed downlink transmissions.
-    - class_b_ping_slot_nb_k (required if supports_class_b): The devices' Class-B ping-slots per beacon period.
+    - class_b_ping_slot_periodicity (required if supports_class_b): The devices' Class-B ping-slots per beacon period.
     - class_b_ping_slot_dr (required if supports_class_b): The devices' Class-B ping-slot data rate.
     - class_b_ping_slot_freq (required if supports_class_b): The devices' Class-B ping-slot freq (Hz).
     - class_c_timeout (required if supports_class_c): The devices' Class-C timeout in seconds for confirmed downlink transmissions.
@@ -1042,7 +1042,7 @@ class DeviceProfile:
     def __init__(self,name:str,tenant_id:str,region:Region,mac_version:MacVersion,reg_params_revision:RegParamsRevision,
         uplink_interval:int,supports_otaa:bool,supports_class_b:bool,supports_class_c:bool,abp_rx1_delay:int=None,
         abp_rx1_dr_offset:int=None,abp_rx2_dr:int=None,abp_rx2_freq:int=None,class_b_timeout:int=None,
-        class_b_ping_slot_nb_k:ClassBPingSlot=ClassBPingSlot.NONE,class_b_ping_slot_dr:int=None,class_b_ping_slot_freq:int=None,
+        class_b_ping_slot_periodicity:ClassBPingSlot=ClassBPingSlot.NONE,class_b_ping_slot_dr:int=None,class_b_ping_slot_freq:int=None,
         class_c_timeout:int=None,id:str="",description:str='',payload_codec_runtime:CodecRuntime=CodecRuntime.NONE,
         payload_codec_script:str="",flush_queue_on_activate:bool=True,device_status_req_interval:int=1,tags:dict={},
         auto_detect_measurements:bool=True,allow_roaming:bool=False,adr_algorithm_id:AdrAlgorithm=AdrAlgorithm.LORA_ONLY,
@@ -1074,7 +1074,7 @@ class DeviceProfile:
         self._abp_rx2_freq = abp_rx2_freq
         self.supports_class_b = supports_class_b
         self._class_b_timeout = class_b_timeout
-        self._class_b_ping_slot_nb_k = class_b_ping_slot_nb_k.value
+        self._class_b_ping_slot_periodicity = class_b_ping_slot_periodicity.value
         self._class_b_ping_slot_dr = class_b_ping_slot_dr
         self._class_b_ping_slot_freq = class_b_ping_slot_freq
         self.supports_class_c = supports_class_c
@@ -1176,16 +1176,16 @@ class DeviceProfile:
         self._class_b_timeout = value
 
     @property  
-    def class_b_ping_slot_nb_k(self):
-        if self.supports_class_b and self._class_b_ping_slot_nb_k is None:
-            raise ValueError("DeviceProfile: class_b_ping_slot_nb_k is required when supports_class_b is True")
-        return self._class_b_ping_slot_nb_k
+    def class_b_ping_slot_periodicity(self):
+        if self.supports_class_b and self._class_b_ping_slot_periodicity is None:
+            raise ValueError("DeviceProfile: class_b_ping_slot_periodicity is required when supports_class_b is True")
+        return self._class_b_ping_slot_periodicity
 
-    @class_b_ping_slot_nb_k.setter
-    def class_b_ping_slot_nb_k(self, value):
+    @class_b_ping_slot_periodicity.setter
+    def class_b_ping_slot_periodicity(self, value):
         if self.supports_class_b and value is None:
-            raise ValueError("DeviceProfile: class_b_ping_slot_nb_k is required when supports_class_b is True")
-        self._class_b_ping_slot_nb_k = value
+            raise ValueError("DeviceProfile: class_b_ping_slot_periodicity is required when supports_class_b is True")
+        self._class_b_ping_slot_periodicity = value
 
     @property 
     def class_b_ping_slot_dr(self):
@@ -1235,7 +1235,7 @@ class DeviceProfile:
         reg_params_revision_enum = next((r for r in RegParamsRevision if r.value == grpc_device_profile.reg_params_revision), RegParamsRevision.A)
         payload_codec_runtime_enum = next((c for c in CodecRuntime if c.value == grpc_device_profile.payload_codec_runtime), CodecRuntime.NONE)
         adr_algorithm_enum = next((a for a in AdrAlgorithm if a.value == grpc_device_profile.adr_algorithm_id), AdrAlgorithm.LORA_ONLY)
-        class_b_ping_slot_nb_k_enum = next((c for c in ClassBPingSlot if c.value == grpc_device_profile.class_b_ping_slot_periodicity), ClassBPingSlot.NONE)
+        class_b_ping_slot_periodicity_enum = next((c for c in ClassBPingSlot if c.value == grpc_device_profile.class_b_ping_slot_periodicity), ClassBPingSlot.NONE)
         relay_cad_periodicity_enum = next((c for c in CadPeriodicity if c.value == grpc_device_profile.relay_cad_periodicity), CadPeriodicity.NONE)
         relay_second_channel_ack_offset_enum = next((s for s in SecondChAckOffset if s.value == grpc_device_profile.relay_second_channel_ack_offset), SecondChAckOffset.NONE)
         relay_ed_activation_mode_enum = next((r for r in RelayModeActivation if r.value == grpc_device_profile.relay_ed_activation_mode), RelayModeActivation.DISABLED)
@@ -1255,7 +1255,7 @@ class DeviceProfile:
             abp_rx2_dr=getattr(grpc_device_profile, 'abp_rx2_dr', 0),
             abp_rx2_freq=getattr(grpc_device_profile, 'abp_rx2_freq', 0),
             class_b_timeout=getattr(grpc_device_profile, 'class_b_timeout', 0),
-            class_b_ping_slot_nb_k=class_b_ping_slot_nb_k_enum,
+            class_b_ping_slot_nb_k=class_b_ping_slot_periodicity_enum,
             class_b_ping_slot_dr=getattr(grpc_device_profile, 'class_b_ping_slot_dr', 0),
             class_b_ping_slot_freq=getattr(grpc_device_profile, 'class_b_ping_slot_freq', 0),
             class_c_timeout=getattr(grpc_device_profile, 'class_c_timeout', 0),
@@ -1320,7 +1320,7 @@ class DeviceProfile:
             'abp_rx2_freq': self.abp_rx2_freq,
             'supports_class_b': self.supports_class_b,
             'class_b_timeout': self.class_b_timeout,
-            'class_b_ping_slot_nb_k': self.class_b_ping_slot_nb_k,
+            'class_b_ping_slot_periodicity': self.class_b_ping_slot_periodicity,
             'class_b_ping_slot_dr': self.class_b_ping_slot_dr,
             'class_b_ping_slot_freq': self.class_b_ping_slot_freq,
             'supports_class_c': self.supports_class_c,

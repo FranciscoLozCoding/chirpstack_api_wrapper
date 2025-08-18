@@ -696,7 +696,7 @@ class ChirpstackClient:
             Passing in a Gateway object will also work.
         """
         return self._call_rpc("GatewayService", "Delete",
-                             "DeleteGatewayRequest", {"id": str(gateway_id)})
+                             "DeleteGatewayRequest", {"gateway_id": str(gateway_id)})
 
     def update_app(self, app: Application) -> None:
         """
@@ -3412,6 +3412,11 @@ class ChirpstackClient:
         # Handle the exception here
         status_code, details = e.code(), e.details()
 
+        # Don't attempt token refresh for NOT_FOUND errors - these are legitimate API responses
+        if status_code == grpc.StatusCode.NOT_FOUND:
+            logging.error(f"ChirpstackClient.{method.__name__}(): Object not found - {details}")
+            raise e  # Re-raise the original exception
+        
         if status_code == grpc.StatusCode.UNAUTHENTICATED and "ExpiredSignature" in details:
             # Retry login and then re-run the specified method
             logging.warning(f"ChirpstackClient.{method.__name__}():JWT token expired. Retrying login...")

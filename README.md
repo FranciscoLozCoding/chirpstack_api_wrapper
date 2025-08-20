@@ -20,6 +20,11 @@ This is not published on pip so use pip together with git.
 pip install git+https://github.com/waggle-sensor/chirpstack_api_wrapper
 ```
 
+## Versioning
+The version of the wrapper is aligned with the version of the chirpstack-api library, but the patch version can differ.
+
+For example, if the chirpstack-api library is at version 4.14, the wrapper is at version 4.14. But if a patch version is needed, the wrapper can be at version 4.14.1 even if the chirpstack-api library is at version 4.14.0.
+
 ## Test Suite
 To run the test suite download the requirements in `/test/`, then run the following command:
 ```

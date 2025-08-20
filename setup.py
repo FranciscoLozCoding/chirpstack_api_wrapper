@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-VERSION = '1.0.0'
+VERSION = '4.14.0' #major.minor version aligns with chirpstack-api, patch version can differ
 
 setup(
     name='chirpstack_api_wrapper',

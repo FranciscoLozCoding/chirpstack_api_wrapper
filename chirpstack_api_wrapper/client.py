@@ -4,7 +4,8 @@ import logging
 import sys
 import time
 import requests
-from google.protobuf.json_format import ParseDict
+from datetime import datetime
+from google.protobuf.json_format import ParseDict, MessageToDict
 from google.protobuf import empty_pb2
 from chirpstack_api import api
 from chirpstack_api_wrapper.objects import *
@@ -120,7 +121,7 @@ class ChirpstackClient:
         limit: int = LIMIT,
     ) -> list:
         """
-        Aggregate all pages for any <Service>.List RPC.
+        Aggregate all pages for any <Service>.List RPC that has pagination.
 
         Parameters
         ----------
@@ -733,10 +734,10 @@ class ChirpstackClient:
         - List of DeviceProfile objects.
         """
         # First list the DeviceProfile summary items for this application
-        list_response = self._list_with_pagination("ApplicationService", 
-                                                {"application_id": str(app_id)}, 
-                                                "ListDeviceProfilesRequest", 
-                                                "result")
+        list_response = self._call_rpc("ApplicationService",
+                                        "ListDeviceProfiles", 
+                                        request_type="ListApplicationDeviceProfilesRequest", 
+                                        params={"application_id": str(app_id)})
         device_profiles = []
         
         # For each summary item, fetch the full DeviceProfile using Get
@@ -781,864 +782,6 @@ class ChirpstackClient:
             }
             device_tags.append(device_tag)
         return device_tags
-
-    def list_integrations_for_app(self, app_id: Application | str) -> list[dict]:
-        """
-        List integrations for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - List of integration dictionaries.
-        """
-        api_response = self._list_with_pagination("ApplicationService", 
-                                                {"application_id": str(app_id)}, 
-                                                "ListIntegrationsRequest", 
-                                                "result")
-        integrations = []
-        for integration_item in api_response:
-            integration = {
-                'id': getattr(integration_item, 'id', ''),
-                'kind': getattr(integration_item, 'kind', ''),
-                'created_at': getattr(integration_item, 'created_at', ''),
-                'updated_at': getattr(integration_item, 'updated_at', '')
-            }
-            integrations.append(integration)
-        return integrations
-
-    def create_http_integration(self, integration: HttpIntegration) -> None:
-        """
-        Create an HTTP integration for an application.
-
-        Parameters
-        ----------
-        - integration: The HTTP integration record to create.
-        """
-        if not isinstance(integration, HttpIntegration):
-            raise TypeError("Expected HttpIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreateHttpIntegration",
-                             "CreateHttpIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "headers": getattr(integration, 'headers', {}),
-                                     "url": getattr(integration, 'url', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_http_integration(self, app_id: str) -> HttpIntegration | None:
-        """
-        Get HTTP integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - HttpIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetHttpIntegration",
-                                     "GetHttpIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            return HttpIntegration.from_grpc(response.integration)
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_http_integration(): HTTP integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_http_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_http_integration(self, integration: HttpIntegration) -> None:
-        """
-        Update an HTTP integration for an application.
-
-        Parameters
-        ----------
-        - integration: The HTTP integration record to update.
-        """
-        if not isinstance(integration, HttpIntegration):
-            raise TypeError("Expected HttpIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdateHttpIntegration",
-                             "UpdateHttpIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "headers": getattr(integration, 'headers', {}),
-                                     "url": getattr(integration, 'url', '')
-                                 }
-                             })
-
-    def delete_http_integration(self, app_id: str) -> None:
-        """
-        Delete HTTP integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeleteHttpIntegration",
-                             "DeleteHttpIntegrationRequest", {"application_id": app_id})
-
-    def create_influxdb_integration(self, integration: InfluxDbIntegration) -> None:
-        """
-        Create an InfluxDB integration for an application.
-
-        Parameters
-        ----------
-        - integration: The InfluxDB integration record to create.
-        """
-        if not isinstance(integration, InfluxDbIntegration):
-            raise TypeError("Expected InfluxDbIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreateInfluxDbIntegration",
-                             "CreateInfluxDbIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "endpoint": getattr(integration, 'endpoint', ''),
-                                     "token": getattr(integration, 'token', ''),
-                                     "organization": getattr(integration, 'organization', ''),
-                                     "bucket": getattr(integration, 'bucket', ''),
-                                     "version": getattr(integration, 'version', ''),
-                                     "precision": getattr(integration, 'precision', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_influxdb_integration(self, app_id: str) -> InfluxDbIntegration | None:
-        """
-        Get InfluxDB integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - InfluxDbIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetInfluxDbIntegration",
-                                     "GetInfluxDbIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            # Import the enums here to avoid circular imports
-            from chirpstack_api_wrapper.objects import InfluxDbVersion, InfluxDbPrecision
-            
-            # Find the enum values by comparing the response values
-            version_enum = next((v for v in InfluxDbVersion if v.value == response.integration.version), InfluxDbVersion.INFLUXDB_1)
-            precision_enum = next((p for p in InfluxDbPrecision if p.value == response.integration.precision), InfluxDbPrecision.S)
-            
-            integration = InfluxDbIntegration(
-                application_id=response.integration.application_id,
-                endpoint=response.integration.endpoint,
-                token=response.integration.token,
-                organization=response.integration.organization,
-                bucket=response.integration.bucket,
-                version=version_enum,
-                precision=precision_enum,
-                id=response.integration.id
-            )
-            return integration
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_influxdb_integration(): InfluxDB integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_influxdb_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_influxdb_integration(self, integration: InfluxDbIntegration) -> None:
-        """
-        Update an InfluxDB integration for an application.
-
-        Parameters
-        ----------
-        - integration: The InfluxDB integration record to update.
-        """
-        if not isinstance(integration, InfluxDbIntegration):
-            raise TypeError("Expected InfluxDbIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdateInfluxDbIntegration",
-                             "UpdateInfluxDbIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "endpoint": getattr(integration, 'endpoint', ''),
-                                     "token": getattr(integration, 'token', ''),
-                                     "organization": getattr(integration, 'organization', ''),
-                                     "bucket": getattr(integration, 'bucket', ''),
-                                     "version": getattr(integration, 'version', ''),
-                                     "precision": getattr(integration, 'precision', '')
-                                 }
-                             })
-
-    def delete_influxdb_integration(self, app_id: str) -> None:
-        """
-        Delete InfluxDB integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeleteInfluxDbIntegration",
-                             "DeleteInfluxDbIntegrationRequest", {"application_id": app_id})
-
-    def create_thingsboard_integration(self, integration: ThingsBoardIntegration) -> None:
-        """
-        Create a ThingsBoard integration for an application.
-
-        Parameters
-        ----------
-        - integration: The ThingsBoard integration record to create.
-        """
-        if not isinstance(integration, ThingsBoardIntegration):
-            raise TypeError("Expected ThingsBoardIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreateThingsBoardIntegration",
-                             "CreateThingsBoardIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "server": getattr(integration, 'server', ''),
-                                     "token": getattr(integration, 'token', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_thingsboard_integration(self, app_id: str) -> ThingsBoardIntegration | None:
-        """
-        Get ThingsBoard integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - ThingsBoardIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetThingsBoardIntegration",
-                                     "GetThingsBoardIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            integration = ThingsBoardIntegration(
-                application_id=response.integration.application_id,
-                server=response.integration.server,
-                token=response.integration.token,
-                id=response.integration.id
-            )
-            return integration
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_thingsboard_integration(): ThingsBoard integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_thingsboard_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_thingsboard_integration(self, integration: ThingsBoardIntegration) -> None:
-        """
-        Update a ThingsBoard integration for an application.
-
-        Parameters
-        ----------
-        - integration: The ThingsBoard integration record to update.
-        """
-        if not isinstance(integration, ThingsBoardIntegration):
-            raise TypeError("Expected ThingsBoardIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdateThingsBoardIntegration",
-                             "UpdateThingsBoardIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "server": getattr(integration, 'server', ''),
-                                     "token": getattr(integration, 'token', '')
-                                 }
-                             })
-
-    def delete_thingsboard_integration(self, app_id: str) -> None:
-        """
-        Delete ThingsBoard integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeleteThingsBoardIntegration",
-                             "DeleteThingsBoardIntegrationRequest", {"application_id": app_id})
-
-    def create_aws_sns_integration(self, integration: AwsSnsIntegration) -> None:
-        """
-        Create an AWS SNS integration for an application.
-
-        Parameters
-        ----------
-        - integration: The AWS SNS integration record to create.
-        """
-        if not isinstance(integration, AwsSnsIntegration):
-            raise TypeError("Expected AwsSnsIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreateAwsSnsIntegration",
-                             "CreateAwsSnsIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "aws_region": getattr(integration, 'aws_region', ''),
-                                     "aws_access_key_id": getattr(integration, 'aws_access_key_id', ''),
-                                     "aws_secret_access_key": getattr(integration, 'aws_secret_access_key', ''),
-                                     "topic_arn": getattr(integration, 'topic_arn', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_aws_sns_integration(self, app_id: str) -> AwsSnsIntegration | None:
-        """
-        Get AWS SNS integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - AwsSnsIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetAwsSnsIntegration",
-                                     "GetAwsSnsIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            integration = AwsSnsIntegration(
-                application_id=response.integration.application_id,
-                aws_region=response.integration.aws_region,
-                aws_access_key_id=response.integration.aws_access_key_id,
-                aws_secret_access_key=response.integration.aws_secret_access_key,
-                topic_arn=response.integration.topic_arn,
-                id=response.integration.id
-            )
-            return integration
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_aws_sns_integration(): AWS SNS integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_aws_sns_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_aws_sns_integration(self, integration: AwsSnsIntegration) -> None:
-        """
-        Update an AWS SNS integration for an application.
-
-        Parameters
-        ----------
-        - integration: The AWS SNS integration record to update.
-        """
-        if not isinstance(integration, AwsSnsIntegration):
-            raise TypeError("Expected AwsSnsIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdateAwsSnsIntegration",
-                             "UpdateAwsSnsIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "aws_region": getattr(integration, 'aws_region', ''),
-                                     "aws_access_key_id": getattr(integration, 'aws_access_key_id', ''),
-                                     "aws_secret_access_key": getattr(integration, 'aws_secret_access_key', ''),
-                                     "topic_arn": getattr(integration, 'topic_arn', '')
-                                 }
-                             })
-
-    def delete_aws_sns_integration(self, app_id: str) -> None:
-        """
-        Delete AWS SNS integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeleteAwsSnsIntegration",
-                             "DeleteAwsSnsIntegrationRequest", {"application_id": app_id})
-
-    def create_azure_service_bus_integration(self, integration: AzureServiceBusIntegration) -> None:
-        """
-        Create an Azure Service Bus integration for an application.
-
-        Parameters
-        ----------
-        - integration: The Azure Service Bus integration record to create.
-        """
-        if not isinstance(integration, AzureServiceBusIntegration):
-            raise TypeError("Expected AzureServiceBusIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreateAzureServiceBusIntegration",
-                             "CreateAzureServiceBusIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "connection_string": getattr(integration, 'connection_string', ''),
-                                     "topic_name": getattr(integration, 'topic_name', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_azure_service_bus_integration(self, app_id: str) -> AzureServiceBusIntegration | None:
-        """
-        Get Azure Service Bus integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - AzureServiceBusIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetAzureServiceBusIntegration",
-                                     "GetAzureServiceBusIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            integration = AzureServiceBusIntegration(
-                application_id=response.integration.application_id,
-                connection_string=response.integration.connection_string,
-                topic_name=response.integration.topic_name,
-                id=response.integration.id
-            )
-            return integration
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_azure_service_bus_integration(): Azure Service Bus integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_azure_service_bus_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_azure_service_bus_integration(self, integration: AzureServiceBusIntegration) -> None:
-        """
-        Update an Azure Service Bus integration for an application.
-
-        Parameters
-        ----------
-        - integration: The Azure Service Bus integration record to update.
-        """
-        if not isinstance(integration, AzureServiceBusIntegration):
-            raise TypeError("Expected AzureServiceBusIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdateAzureServiceBusIntegration",
-                             "UpdateAzureServiceBusIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "connection_string": getattr(integration, 'connection_string', ''),
-                                     "topic_name": getattr(integration, 'topic_name', '')
-                                 }
-                             })
-
-    def delete_azure_service_bus_integration(self, app_id: str) -> None:
-        """
-        Delete Azure Service Bus integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeleteAzureServiceBusIntegration",
-                             "DeleteAzureServiceBusIntegrationRequest", {"application_id": app_id})
-
-    def create_gcp_pubsub_integration(self, integration: GcpPubSubIntegration) -> None:
-        """
-        Create a GCP Pub/Sub integration for an application.
-
-        Parameters
-        ----------
-        - integration: The GCP Pub/Sub integration record to create.
-        """
-        if not isinstance(integration, GcpPubSubIntegration):
-            raise TypeError("Expected GcpPubSubIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreateGcpPubSubIntegration",
-                             "CreateGcpPubSubIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "encoding": getattr(integration, 'encoding', ''),
-                                     "project_id": getattr(integration, 'project_id', ''),
-                                     "topic_name": getattr(integration, 'topic_name', ''),
-                                     "service_account_key": getattr(integration, 'service_account_key', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_gcp_pubsub_integration(self, app_id: str) -> GcpPubSubIntegration | None:
-        """
-        Get GCP Pub/Sub integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - GcpPubSubIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetGcpPubSubIntegration",
-                                     "GetGcpPubSubIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            # Import the enum here to avoid circular imports
-            from chirpstack_api_wrapper.objects import Encoding
-            
-            # Find the enum value by comparing the response value
-            encoding_enum = next((e for e in Encoding if e.value == response.integration.encoding), Encoding.JSON)
-            
-            integration = GcpPubSubIntegration(
-                application_id=response.integration.application_id,
-                encoding=encoding_enum,
-                project_id=response.integration.project_id,
-                topic_name=response.integration.topic_name,
-                service_account_key=response.integration.service_account_key,
-                id=response.integration.id
-            )
-            return integration
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_gcp_pubsub_integration(): GCP Pub/Sub integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_gcp_pubsub_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_gcp_pubsub_integration(self, integration: GcpPubSubIntegration) -> None:
-        """
-        Update a GCP Pub/Sub integration for an application.
-
-        Parameters
-        ----------
-        - integration: The GCP Pub/Sub integration record to update.
-        """
-        if not isinstance(integration, GcpPubSubIntegration):
-            raise TypeError("Expected GcpPubSubIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdateGcpPubSubIntegration",
-                             "UpdateGcpPubSubIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "encoding": getattr(integration, 'encoding', ''),
-                                     "project_id": getattr(integration, 'project_id', ''),
-                                     "topic_name": getattr(integration, 'topic_name', ''),
-                                     "service_account_key": getattr(integration, 'service_account_key', '')
-                                 }
-                             })
-
-    def delete_gcp_pubsub_integration(self, app_id: str) -> None:
-        """
-        Delete GCP Pub/Sub integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeleteGcpPubSubIntegration",
-                             "DeleteGcpPubSubIntegrationRequest", {"application_id": app_id})
-
-    def create_ifttt_integration(self, integration: IftttIntegration) -> None:
-        """
-        Create an IFTTT integration for an application.
-
-        Parameters
-        ----------
-        - integration: The IFTTT integration record to create.
-        """
-        if not isinstance(integration, IftttIntegration):
-            raise TypeError("Expected IftttIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreateIftttIntegration",
-                             "CreateIftttIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "key": getattr(integration, 'key', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_ifttt_integration(self, app_id: str) -> IftttIntegration | None:
-        """
-        Get IFTTT integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - IftttIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetIftttIntegration",
-                                     "GetIftttIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            integration = IftttIntegration(
-                application_id=response.integration.application_id,
-                key=response.integration.key,
-                id=response.integration.id
-            )
-            return integration
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_ifttt_integration(): IFTTT integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_ifttt_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_ifttt_integration(self, integration: IftttIntegration) -> None:
-        """
-        Update an IFTTT integration for an application.
-
-        Parameters
-        ----------
-        - integration: The IFTTT integration record to update.
-        """
-        if not isinstance(integration, IftttIntegration):
-            raise TypeError("Expected IftttIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdateIftttIntegration",
-                             "UpdateIftttIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "key": getattr(integration, 'key', '')
-                                 }
-                             })
-
-    def delete_ifttt_integration(self, app_id: str) -> None:
-        """
-        Delete IFTTT integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeleteIftttIntegration",
-                             "DeleteIftttIntegrationRequest", {"application_id": app_id})
-
-    def create_mydevices_integration(self, integration: MyDevicesIntegration) -> None:
-        """
-        Create a MyDevices integration for an application.
-
-        Parameters
-        ----------
-        - integration: The MyDevices integration record to create.
-        """
-        if not isinstance(integration, MyDevicesIntegration):
-            raise TypeError("Expected MyDevicesIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreateMyDevicesIntegration",
-                             "CreateMyDevicesIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "endpoint": getattr(integration, 'endpoint', ''),
-                                     "token": getattr(integration, 'token', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_mydevices_integration(self, app_id: str) -> MyDevicesIntegration | None:
-        """
-        Get MyDevices integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - MyDevicesIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetMyDevicesIntegration",
-                                     "GetMyDevicesIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            integration = MyDevicesIntegration(
-                application_id=response.integration.application_id,
-                endpoint=response.integration.endpoint,
-                token=response.integration.token,
-                id=response.integration.id
-            )
-            return integration
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_mydevices_integration(): MyDevices integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_mydevices_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_mydevices_integration(self, integration: MyDevicesIntegration) -> None:
-        """
-        Update a MyDevices integration for an application.
-
-        Parameters
-        ----------
-        - integration: The MyDevices integration record to update.
-        """
-        if not isinstance(integration, MyDevicesIntegration):
-            raise TypeError("Expected MyDevicesIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdateMyDevicesIntegration",
-                             "UpdateMyDevicesIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "endpoint": getattr(integration, 'endpoint', ''),
-                                     "token": getattr(integration, 'token', '')
-                                 }
-                             })
-
-    def delete_mydevices_integration(self, app_id: str) -> None:
-        """
-        Delete MyDevices integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeleteMyDevicesIntegration",
-                             "DeleteMyDevicesIntegrationRequest", {"application_id": app_id})
-
-    def create_pilot_things_integration(self, integration: PilotThingsIntegration) -> None:
-        """
-        Create a Pilot Things integration for an application.
-
-        Parameters
-        ----------
-        - integration: The Pilot Things integration record to create.
-        """
-        if not isinstance(integration, PilotThingsIntegration):
-            raise TypeError("Expected PilotThingsIntegration object")
-        
-        resp = self._call_rpc("ApplicationService", "CreatePilotThingsIntegration",
-                             "CreatePilotThingsIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "server": getattr(integration, 'server', ''),
-                                     "token": getattr(integration, 'token', '')
-                                 }
-                             })
-        integration.id = resp.id
-        return
-
-    def get_pilot_things_integration(self, app_id: str) -> PilotThingsIntegration | None:
-        """
-        Get Pilot Things integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-
-        Returns
-        -------
-        - PilotThingsIntegration object or None if not found.
-        """
-        try:
-            response = self._call_rpc("ApplicationService", "GetPilotThingsIntegration",
-                                     "GetPilotThingsIntegrationRequest", {"application_id": app_id})
-            
-            if not response or not hasattr(response, 'integration'):
-                return None
-            
-            integration = PilotThingsIntegration(
-                application_id=response.integration.application_id,
-                server=response.integration.server,
-                token=response.integration.token,
-                id=response.integration.id
-            )
-            return integration
-            
-        except grpc.RpcError as e:
-            status_code, details = e.code(), e.details()
-            if status_code == grpc.StatusCode.NOT_FOUND:
-                logging.error(f"ChirpstackClient.get_pilot_things_integration(): Pilot Things integration for app {app_id} not found - {details}")
-            else:
-                logging.error(f"ChirpstackClient.get_pilot_things_integration(): An error occurred with status code {status_code} - {details}")
-            return None
-
-    def update_pilot_things_integration(self, integration: PilotThingsIntegration) -> None:
-        """
-        Update a Pilot Things integration for an application.
-
-        Parameters
-        ----------
-        - integration: The Pilot Things integration record to update.
-        """
-        if not isinstance(integration, PilotThingsIntegration):
-            raise TypeError("Expected PilotThingsIntegration object")
-        
-        return self._call_rpc("ApplicationService", "UpdatePilotThingsIntegration",
-                             "UpdatePilotThingsIntegrationRequest", {
-                                 "integration": {
-                                     "application_id": getattr(integration, 'application_id', ''),
-                                     "server": getattr(integration, 'server', ''),
-                                     "token": getattr(integration, 'token', '')
-                                 }
-                             })
-
-    def delete_pilot_things_integration(self, app_id: str) -> None:
-        """
-        Delete Pilot Things integration for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "DeletePilotThingsIntegration",
-                             "DeletePilotThingsIntegrationRequest", {"application_id": app_id})
-
-    def generate_mqtt_integration_client_certificate(self, app_id: str) -> dict:
-        """
-        Generate MQTT integration client certificate for an application.
-
-        Parameters
-        ----------
-        - app_id: Application ID.
-        """
-        return self._call_rpc("ApplicationService", "GenerateMqttIntegrationClientCertificate",
-                             "GenerateMqttIntegrationClientCertificateRequest", {"application_id": app_id})
 
     def update_device(self, device: Device) -> None:
         """
@@ -1698,32 +841,29 @@ class ChirpstackClient:
         return self._call_rpc("DeviceService", "DeleteKeys",
                              "DeleteDeviceKeysRequest", {"dev_eui": str(dev_eui)})
 
-    def activate_device(self, dev_eui: Device | str, dev_addr: str, 
-                       nwk_s_key: str, app_s_key: str, f_cnt_up: int = 0, 
-                       f_cnt_down: int = 0, skip_f_cnt_check: bool = False) -> None:
+    def activate_device(self, device_activation: DeviceActivation) -> None:
         """
         Activate a device (ABP).
 
         Parameters
         ----------
-        - dev_eui: Device EUI.
-        - dev_addr: Device address.
-        - nwk_s_key: Network session key.
-        - app_s_key: Application session key.
-        - f_cnt_up: Frame counter up.
-        - f_cnt_down: Frame counter down.
-        - skip_f_cnt_check: Skip frame counter check.
+        - device_activation: DeviceActivation object.
         """
+        if not isinstance(device_activation, DeviceActivation):
+            raise TypeError("Expected DeviceActivation object")
+        
         return self._call_rpc("DeviceService", "Activate",
                              "ActivateDeviceRequest", {
                                  "device_activation": {
-                                     "dev_eui": str(dev_eui),
-                                     "dev_addr": dev_addr,
-                                     "nwk_s_key": nwk_s_key,
-                                     "app_s_key": app_s_key,
-                                     "f_cnt_up": f_cnt_up,
-                                     "f_cnt_down": f_cnt_down,
-                                     "skip_f_cnt_check": skip_f_cnt_check
+                                     "dev_eui": getattr(device_activation, 'dev_eui', ''),
+                                     "dev_addr": getattr(device_activation, 'dev_addr', ''),
+                                     "app_s_key": getattr(device_activation, 'app_s_key', ''),
+                                     "nwk_s_enc_key": getattr(device_activation, 'nwk_s_enc_key', ''),
+                                     "s_nwk_s_int_key": getattr(device_activation, 's_nwk_s_int_key', ''),
+                                     "f_nwk_s_int_key": getattr(device_activation, 'f_nwk_s_int_key', ''),
+                                     "f_cnt_up": getattr(device_activation, 'f_cnt_up', 0),
+                                     "n_f_cnt_down": getattr(device_activation, 'n_f_cnt_down', 0),
+                                     "a_f_cnt_down": getattr(device_activation, 'a_f_cnt_down', 0)
                                  }
                              })
 
@@ -1800,16 +940,34 @@ class ChirpstackClient:
                                  "end": end
                              })
 
-    def get_device_link_metrics(self, dev_eui: Device | str) -> dict:
+    def get_device_link_metrics(self, dev_eui: Device | str, start: datetime, end: datetime, aggregation: Aggregation) -> dict:
         """
         Get device link metrics.
 
         Parameters
         ----------
         - dev_eui: Device EUI.
+        - start: Start date in UTC.
+        - end: End date in UTC.
+        - aggregation: Aggregation type.
         """
-        return self._call_rpc("DeviceService", "GetLinkMetrics",
-                             "GetDeviceLinkMetricsRequest", {"dev_eui": str(dev_eui)})
+        # Ensure start and end are timezone-aware UTC datetimes
+        if start.tzinfo is None:
+            raise ValueError("start must be timezone-aware (UTC)")
+        if end.tzinfo is None:
+            raise ValueError("end must be timezone-aware (UTC)")
+
+        # Convert datetime to ISO format string for the API
+        start_iso = start.isoformat()
+        end_iso = end.isoformat()
+
+        resp = self._call_rpc("DeviceService", "GetLinkMetrics",
+                             "GetDeviceLinkMetricsRequest", 
+                             {"dev_eui": str(dev_eui),
+                              "start": start_iso,
+                              "end": end_iso,
+                              "aggregation": aggregation.value})
+        return MessageToDict(resp)
 
     def get_next_f_cnt_down(self, dev_eui: Device | str) -> int:
         """
@@ -1843,6 +1001,16 @@ class ChirpstackClient:
         ----------
         - dev_eui: Device EUI.
         """
+        # first check if keys have been created
+        try:
+            self.get_device_keys(dev_eui)
+        except grpc.RpcError as e:
+            status_code, details = e.code(), e.details()
+            if status_code == grpc.StatusCode.NOT_FOUND:
+                raise ValueError(f"ChirpstackClient.flush_dev_nonces(): Device keys not found for {dev_eui}, please create them first - {details}")
+            else:
+                raise ValueError(f"ChirpstackClient.flush_dev_nonces(): An error occurred with status code {status_code} - {details}")
+        
         return self._call_rpc("DeviceService", "FlushDevNonces",
                              "FlushDevNoncesRequest", {"dev_eui": str(dev_eui)})
 
@@ -1860,7 +1028,6 @@ class ChirpstackClient:
         return self._call_rpc("GatewayService", "Update",
                              "UpdateGatewayRequest", {
                                  "gateway": {
-                                     "id": getattr(gateway, 'id', ''),
                                      "gateway_id": getattr(gateway, 'gateway_id', ''),
                                      "name": getattr(gateway, 'name', ''),
                                      "description": getattr(gateway, 'description', ''),
@@ -1872,7 +1039,7 @@ class ChirpstackClient:
                                  }
                              })
 
-    def update_gateway_location(self, gateway_id: str, location: Location) -> None:
+    def update_gateway_location(self, gateway: Gateway, location: Location) -> None:
         """
         Update gateway location.
 
@@ -1895,7 +1062,8 @@ class ChirpstackClient:
         return self._call_rpc("GatewayService", "Update",
                              "UpdateGatewayRequest", {
                                  "gateway": {
-                                     "gateway_id": gateway_id,
+                                     "gateway_id": getattr(gateway, 'gateway_id', ''),
+                                     "name": getattr(gateway, 'name', ''),
                                      "location": location_dict
                                  }
                              })
@@ -1934,7 +1102,7 @@ class ChirpstackClient:
                                  "end": end
                              })
 
-    def generate_gateway_client_certificate(self, gateway_id: Gateway | str) -> dict:
+    def generate_gateway_client_certificate(self, gateway_id: Gateway | str) -> dict: #pragma: no cover
         """
         Generate a client certificate for a gateway.
 
@@ -2206,7 +1374,7 @@ class ChirpstackClient:
         return self._call_rpc("TenantService", "Delete",
                              "DeleteTenantRequest", {"id": str(tenant_id)})
 
-    def create_user(self, user: User, tenant_id: str) -> None:
+    def create_user(self, user: User, tenant_id: str, tenant_is_device_admin: bool = False, tenant_is_gateway_admin: bool = False) -> None:
         """
         Create a User.
 
@@ -2222,12 +1390,18 @@ class ChirpstackClient:
                              "CreateTenantUserRequest", {
                                  "user": {
                                      "email": getattr(user, 'email', ''),
-                                     "password": getattr(user, 'password', ''),
                                      "is_active": getattr(user, 'is_active', ''),
-                                     "is_admin": getattr(user, 'is_admin', ''),
                                      "note": getattr(user, 'note', '')
                                  },
-                                 "tenant_id": tenant_id
+                                 "password": getattr(user, 'password', ''),
+                                 "tenants": [
+                                     {
+                                         "tenant_id": tenant_id,
+                                         "is_admin": getattr(user, 'is_admin', False),
+                                         "is_device_admin": tenant_is_device_admin,
+                                         "is_gateway_admin": tenant_is_gateway_admin
+                                     }
+                                 ]
                              })
         user.id = resp.id
         return
@@ -2356,11 +1530,11 @@ class ChirpstackClient:
                              "CreateUserRequest", {
                                  "user": {
                                      "email": getattr(user, 'email', ''),
-                                     "password": getattr(user, 'password', ''),
                                      "is_active": getattr(user, 'is_active', ''),
                                      "is_admin": getattr(user, 'is_admin', ''),
                                      "note": getattr(user, 'note', '')
-                                 }
+                                 },
+                                 "password": getattr(user, 'password', '')
                              })
         user.id = resp.id
         return
@@ -3508,3 +2682,17 @@ class ChirpstackClient:
                     )
                     continue
         return gateways
+
+    def get_device_keys(self, dev_eui: Device | str) -> DeviceKeys | None:
+        """
+        Get device keys.
+
+        Parameters
+        ----------
+        - dev_eui: Device EUI.
+        """
+        resp = self._call_rpc("DeviceService", "GetKeys",
+                             "GetDeviceKeysRequest", {"dev_eui": str(dev_eui)})
+        if resp and hasattr(resp, "device_keys"):
+            return DeviceKeys.from_grpc(resp.device_keys)
+        return None
